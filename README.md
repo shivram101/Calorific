@@ -80,13 +80,13 @@ npm create vite@latest
 - If prompted, select `OxLint`.
 - Finally, `Yes`
 
-- (The *HACKY* bit) Using GitHub's VCS, revert/discard the changes Vite made to the files in the project.
-
 3. Add the `tailwindcss` node_module
 ```powershell
 npm install tailwindcss
 ```
-- This did will no longer make a  `import tailwindcss from '@tailwindcss/vite'` 
+
+- (The *HACKY* bit) Using GitHub's VCS, revert/discard the changes Vite made to the files in the project.
+
 
 4. **Run the frontend!**
 ```powershell
@@ -115,6 +115,11 @@ npm install cors
 ```
 
 - (The *HACKY* bit, like before) Using GitHub's VCS, revert/discard the changes Vite made to the files in the project.
+
+2. **Run the backend!**
+```powershell
+npm start
+```
 
 ## Links
 - N/A
