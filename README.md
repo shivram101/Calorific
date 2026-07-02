@@ -121,6 +121,40 @@ npm install cors
 npm start
 ```
 
+>Setup for the mobile follows after the steps from the backend. Mobile and Frontend setups are mutually exclusive.
+
+---
+
+## Local Mobile Setup (Windows):
+### Prerequesites: 
+- The same Prerequesites as the Frontend setup.
+
+---
+
+- *You will need to open another Terminal Window*
+- If you will be doing Mobile development and not WebDev (using frontend), then you can 
+
+
+1. Create Mobile (React Native + Expo)
+```powershell
+npx create-expo-app@latest mobile
+```
+- Select `Latest (SDK 57)`.
+- Press `Y` when prompted to skip creating a new git repo.
+
+- (The *HACKY* bit, like before) Using GitHub's VCS, revert/discard the changes Vite made to the files in the project.
+
+2. **Run Android!**
+```powershell/
+cd mobile
+npm run android
+```
+
+- Either use an [Android Emulator](https://docs.expo.dev/workflow/android-studio-emulator/) or personal connected Android device when building and shipping.
+    - For physical device: Scan QR Code or enter `exp` URL address through the Expo Go app to
+
+---
+
 ## Links
 - N/A
   
