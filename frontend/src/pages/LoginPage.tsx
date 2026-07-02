@@ -27,47 +27,140 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-md">
-        <h1 className="text-3xl font-bold text-green-600 mb-2">Calorific</h1>
-        <p className="text-gray-500 mb-6">Log in to your account</p>
+    <div
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#FFF8ED',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Decorative food emoji */}
+      <div style={{ position: 'absolute', fontSize: '110px', top: '-30px', left: '-30px', opacity: 0.5 }}>🍃</div>
+      <div style={{ position: 'absolute', fontSize: '90px', bottom: '-20px', right: '-10px', opacity: 0.5 }}>🥑</div>
+      <div style={{ position: 'absolute', fontSize: '60px', top: '65%', left: '6%', opacity: 0.4 }}>🍊</div>
+      <div style={{ position: 'absolute', fontSize: '50px', top: '10%', right: '12%', opacity: 0.35 }}>🍓</div>
 
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+      {/* Card */}
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: '24px',
+          padding: '44px 36px',
+          width: '100%',
+          maxWidth: '400px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.07)',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '10px' }}>🥗</div>
+          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Calorific</h1>
+          <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '6px' }}>Good food starts here</p>
+        </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        {error && (
+          <div
+            style={{
+              background: '#FDF0EE',
+              border: '1px solid #DC4C3F',
+              color: '#DC4C3F',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              fontSize: '13px',
+              marginBottom: '18px',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
+              Email address
+            </label>
             <input
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              style={{
+                width: '100%',
+                background: '#FFF8ED',
+                border: '1px solid transparent',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                color: '#2D2A26',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.target.style.border = '1px solid #1FA873')}
+              onBlur={e => (e.target.style.border = '1px solid transparent')}
               required
             />
           </div>
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#2D2A26' }}>Password</label>
+              <a href="/forgot-password" style={{ fontSize: '12px', color: '#1FA873', textDecoration: 'none' }}>
+                Forgot password?
+              </a>
+            </div>
             <input
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+              style={{
+                width: '100%',
+                background: '#FFF8ED',
+                border: '1px solid transparent',
+                borderRadius: '12px',
+                padding: '12px 16px',
+                fontSize: '14px',
+                color: '#2D2A26',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.target.style.border = '1px solid #1FA873')}
+              onBlur={e => (e.target.style.border = '1px solid transparent')}
               required
             />
           </div>
+
           <button
             type="submit"
-            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition"
+            style={{
+              width: '100%',
+              background: '#1FA873',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '14px',
+              padding: '13px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginTop: '6px',
+            }}
           >
             Log In
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p style={{ textAlign: 'center', fontSize: '13px', color: '#8A8378', marginTop: '22px' }}>
           Don't have an account?{' '}
-          <a href="/signup" className="text-green-600 font-medium hover:underline">Sign Up</a>
+          <a href="/signup" style={{ color: '#1FA873', fontWeight: 600, textDecoration: 'none' }}>
+            Sign Up
+          </a>
         </p>
       </div>
     </div>
