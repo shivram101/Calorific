@@ -3,7 +3,7 @@ import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import OnboardingPage from './pages/OnboardingPage';
-
+import DashboardPage from './pages/DashboardPage';
 function App() {
   return (
     <Router>
@@ -12,6 +12,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/Dashboard" element={<DashboardPage />} />
       </Routes>
     </Router>
   );
