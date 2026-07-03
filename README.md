@@ -142,13 +142,20 @@ npx create-expo-app@latest mobile
 - Select `Latest (SDK 57)`.
 - Press `Y` when prompted to skip creating a new git repo.
 
+2. Like Frontend, with `tailwindcss` node_module, install `nativewind` (if needed follow along their [Getting Started](https://www.nativewind.dev/docs/getting-started/installation))
+```powershell
+npm install nativewind react-native-reanimated react-native-safe-area-context
+npm install --save-dev tailwindcss@3.4.17 prettier-plugin-tailwindcss@0.5.11 babel-preset-expo
+```
+
 - (The *HACKY* bit, like before) Using GitHub's VCS, revert/discard the changes Vite made to the files in the project.
 
-2. **Run Android!**
+3. **Run Android!**
 ```powershell/
 cd mobile
 npm run android
 ```
+- *note: if you aren't seeing the tailwindcss, you may need to rebundle the app with a fresh start. Use: `npx expo start -c`*
 
 - Either use an [Android Emulator](https://docs.expo.dev/workflow/android-studio-emulator/) or personal connected Android device when building and shipping.
     - For physical device: Scan QR Code or enter `exp` URL address through the Expo Go app to
