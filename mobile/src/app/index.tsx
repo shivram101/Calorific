@@ -2,6 +2,7 @@ import { Link } from "expo-router";
 import { Text, View, StyleSheet } from "react-native";
 
 // Web-frontend equivalent: LandingPage.tsx
+// Will be used to test other pages for now until they have been ported over...
 export default function Index() {
   return (
     <View style={styles.container}>

@@ -162,6 +162,16 @@ npm run android
 
 ---
 
+### Good Practices
+- Use `.env` file environment variables:
+```powershell
+npm install dotenv
+npm install --save-dev @types/node
+```
+
+Add `import * as dotenv from 'dotenv';` to the header of the file, and access it through `process.env` (e.g., `const port = process.env.PORT;`, for PORT variaable).
+
+
 ## Links
 - N/A
   
