@@ -42,7 +42,6 @@ function LoginPage() {
       {/* Decorative food emoji */}
       <div style={{ position: 'absolute', fontSize: '110px', top: '-30px', left: '-30px', opacity: 0.5 }}>🍃</div>
       <div style={{ position: 'absolute', fontSize: '90px', bottom: '-20px', right: '-10px', opacity: 0.5 }}>🥑</div>
-      <div style={{ position: 'absolute', fontSize: '60px', top: '65%', left: '6%', opacity: 0.4 }}>🍊</div>
       <div style={{ position: 'absolute', fontSize: '50px', top: '10%', right: '12%', opacity: 0.35 }}>🍓</div>
 
       {/* Card */}
@@ -50,19 +49,19 @@ function LoginPage() {
         style={{
           background: '#ffffff',
           borderRadius: '24px',
-          padding: '44px 36px',
+          padding: '40px 34px',
           width: '100%',
-          maxWidth: '400px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.07)',
+          maxWidth: '380px',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.07)',
           position: 'relative',
           zIndex: 1,
         }}
       >
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '10px' }}>🥗</div>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Calorific</h1>
-          <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '6px' }}>Good food starts here</p>
+        <div style={{ textAlign: 'center', marginBottom: '26px' }}>
+          <div style={{ fontSize: '36px', marginBottom: '8px' }}>🥗</div>
+          <h1 style={{ fontSize: '21px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Calorific</h1>
+          <p style={{ fontSize: '12px', color: '#8A8378', marginTop: '5px' }}>Good food starts here</p>
         </div>
 
         {error && (
@@ -81,58 +80,75 @@ function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
-              Email address
-            </label>
+        <form onSubmit={handleLogin}>
+          {/* Email */}
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
+            Email address
+          </label>
+          <div
+            style={{
+              background: '#FFF8ED',
+              borderRadius: '12px',
+              padding: '11px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '14px',
+              border: '1px solid transparent',
+            }}
+            onFocus={e => (e.currentTarget.style.border = '1px solid #1FA873')}
+          >
+            <i className="ti ti-mail" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
             <input
               type="email"
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
               style={{
-                width: '100%',
-                background: '#FFF8ED',
-                border: '1px solid transparent',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                fontSize: '14px',
-                color: '#2D2A26',
+                border: 'none',
                 outline: 'none',
-                boxSizing: 'border-box',
+                background: 'transparent',
+                fontSize: '13px',
+                color: '#2D2A26',
+                width: '100%',
               }}
-              onFocus={e => (e.target.style.border = '1px solid #1FA873')}
-              onBlur={e => (e.target.style.border = '1px solid transparent')}
               required
             />
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 500, color: '#2D2A26' }}>Password</label>
-              <a href="/forgot-password" style={{ fontSize: '12px', color: '#1FA873', textDecoration: 'none' }}>
-                Forgot password?
-              </a>
-            </div>
+          {/* Password */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 500, color: '#2D2A26' }}>Password</label>
+            <a href="/forgot-password" style={{ fontSize: '11px', color: '#1FA873', textDecoration: 'none' }}>
+              Forgot?
+            </a>
+          </div>
+          <div
+            style={{
+              background: '#FFF8ED',
+              borderRadius: '12px',
+              padding: '11px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '20px',
+              border: '1px solid transparent',
+            }}
+          >
+            <i className="ti ti-lock" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
             <input
               type="password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}
               style={{
-                width: '100%',
-                background: '#FFF8ED',
-                border: '1px solid transparent',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                fontSize: '14px',
-                color: '#2D2A26',
+                border: 'none',
                 outline: 'none',
-                boxSizing: 'border-box',
+                background: 'transparent',
+                fontSize: '13px',
+                color: '#2D2A26',
+                width: '100%',
               }}
-              onFocus={e => (e.target.style.border = '1px solid #1FA873')}
-              onBlur={e => (e.target.style.border = '1px solid transparent')}
               required
             />
           </div>
@@ -146,17 +162,17 @@ function LoginPage() {
               border: 'none',
               borderRadius: '14px',
               padding: '13px',
-              fontSize: '14px',
+              fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
-              marginTop: '6px',
+              boxShadow: '0 6px 16px rgba(31,168,115,0.3)',
             }}
           >
             Log In
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: '13px', color: '#8A8378', marginTop: '22px' }}>
+        <p style={{ textAlign: 'center', fontSize: '13px', color: '#8A8378', marginTop: '20px' }}>
           Don't have an account?{' '}
           <a href="/signup" style={{ color: '#1FA873', fontWeight: 600, textDecoration: 'none' }}>
             Sign Up
