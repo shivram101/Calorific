@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { loadGoals } from "./GoalsPage";
 
 type Meal = "Breakfast" | "Lunch" | "Dinner" | "Snacks";
 
@@ -22,11 +24,12 @@ const MOCK_FOODS: FoodItem[] = [
     { id: "4", name: "Greek yogurt", calories: 150, protein: 15, carbs: 9, fat: 6, time: "3:05 PM", meal: "Snacks", favorite: true },
 ];
 
-const GOALS = { calories: 2727, protein: 273, carbs: 136, fat: 121 };
 
 const MEALS: Meal[] = ["Breakfast", "Lunch", "Dinner", "Snacks"];
 
 function DashboardPage() {
+    const navigate = useNavigate();
+    const GOALS = loadGoals();
     const [foods, setFoods] = useState<FoodItem[]>(MOCK_FOODS);
     const [search, setSearch] = useState("");
     const [activeTab, setActiveTab] = useState<"All" | "Favorites">("All");
@@ -105,7 +108,7 @@ function DashboardPage() {
                 <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
                     <div style={styles.brand}>Calorific</div>
                     <div style={styles.ribbonItem}>Log</div>
-                    <div style={styles.ribbonItemMuted}>Goals</div>
+                    <div style={styles.ribbonItemMuted} onClick={() => navigate("/goals")}>Goals</div>
                     <div style={styles.ribbonItemMuted}>Settings</div>
                 </div>
 
