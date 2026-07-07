@@ -46,9 +46,10 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
-          script_stop: true
           script: |
             set -e
+
+            echo "Preparing frontend directory..."
             mkdir -p /var/www/html
             rm -rf /var/www/html/*
 
@@ -71,18 +72,25 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
-          script_stop: true
           script: |
             set -e
+
+            echo "Preparing backend directory..."
             mkdir -p /var/calorificServer
 
-            # Remove old backend code, but preserve sensitive/runtime files.
-            find /var/calorificServer -mindepth 1 \
-              ! -name ".env" \
-              ! -name "node_modules" \
-              ! -name "logs" \
-              ! -name "uploads" \
-              -exec rm -rf {} +
+            echo "Cleaning old backend files while preserving .env and node_modules..."
+
+            cd /var/calorificServer
+
+            for item in * .*; do
+              case "$item" in
+                "."|".."|".env"|"node_modules"|"logs"|"uploads")
+                  ;;
+                *)
+                  rm -rf "$item"
+                  ;;
+              esac
+            done
 
       - name: Deploy backend files to droplet
         uses: appleboy/scp-action@v0.1.7
@@ -96,14 +104,13 @@ jobs:
           strip_components: 1
           overwrite: true
 
-      - name: Install backend dependencies and restart PM2
+      - name: Install backend dependencies and restart backend
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
-          script_stop: true
           script: |
             set -e
 
@@ -112,17 +119,21 @@ jobs:
             echo "Installing backend dependencies..."
             npm ci --omit=dev
 
-            echo "Ensuring PM2 is installed..."
-            command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+            echo "Installing PM2 if needed..."
+            if ! command -v pm2 >/dev/null 2>&1; then
+              npm install -g pm2
+            fi
 
-            echo "Restarting backend..."
+            echo "Restarting backend with PM2..."
             pm2 reload calorific-backend --update-env || pm2 start server.js --name calorific-backend
 
             echo "Saving PM2 process list..."
             pm2 save
 
-            echo "Reloading Nginx..."
+            echo "Testing Nginx config..."
             nginx -t
+
+            echo "Reloading Nginx..."
             systemctl reload nginx
 
             echo "Deployment complete."
