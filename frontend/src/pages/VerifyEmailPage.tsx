@@ -1,40 +1,35 @@
+// src/pages/VerifyEmailPage.tsx
+// FIX: Original sent token as ?token= query param.
+// API expects it as a path param: GET /api/verify-email/:token
+// Also updated to use the centralized API client.
+//
+// The verify link in the email points to /verify-email/<token> (path-based).
+// This page reads the token from the URL path using useParams().
+// App.tsx route must be: <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
+
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { verifyEmail } from '../api/client';
 
 function VerifyEmailPage() {
-  const [searchParams] = useSearchParams();
+  const { token } = useParams<{ token: string }>();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const token = searchParams.get('token');
-
     if (!token) {
       setStatus('error');
       setMessage('Missing verification token.');
       return;
     }
 
-    async function verify() {
-      try {
-        const res = await fetch(`http://localhost:5000/api/verify-email?token=${token}`, {
-          method: 'GET',
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          setStatus('error');
-          setMessage(data.message || 'Verification failed. The link may have expired.');
-        } else {
-          setStatus('success');
-        }
-      } catch (err) {
+    verifyEmail(token)
+      .then(() => setStatus('success'))
+      .catch((err: Error) => {
         setStatus('error');
-        setMessage('Server error. Please try again later.');
-      }
-    }
-
-    verify();
-  }, [searchParams]);
+        setMessage(err.message || 'Verification failed. The link may have expired.');
+      });
+  }, [token]);
 
   return (
     <div
@@ -69,9 +64,7 @@ function VerifyEmailPage() {
           <>
             <div style={{ fontSize: '36px', marginBottom: '12px' }}>⏳</div>
             <h1 style={{ fontSize: '19px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Verifying your email...</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px' }}>
-              Please wait a moment.
-            </p>
+            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px' }}>Please wait a moment.</p>
           </>
         )}
 
@@ -107,9 +100,7 @@ function VerifyEmailPage() {
           <>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>❌</div>
             <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Verification failed</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px', lineHeight: 1.6 }}>
-              {message}
-            </p>
+            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px', lineHeight: 1.6 }}>{message}</p>
             <a
               href="/signup"
               style={{
