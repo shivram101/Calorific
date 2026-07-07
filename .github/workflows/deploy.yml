@@ -1,0 +1,128 @@
+name: Deploy MERN App to DigitalOcean
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mern
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Clean frontend directory on droplet
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT }}
+          script_stop: true
+          script: |
+            set -e
+            mkdir -p /var/www/html
+            rm -rf /var/www/html/*
+
+      - name: Deploy frontend build to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT }}
+          source: "frontend/dist/*"
+          target: "/var/www/html"
+          strip_components: 2
+          overwrite: true
+
+      - name: Clean backend directory on droplet
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT }}
+          script_stop: true
+          script: |
+            set -e
+            mkdir -p /var/calorificServer
+
+            # Remove old backend code, but preserve sensitive/runtime files.
+            find /var/calorificServer -mindepth 1 \
+              ! -name ".env" \
+              ! -name "node_modules" \
+              ! -name "logs" \
+              ! -name "uploads" \
+              -exec rm -rf {} +
+
+      - name: Deploy backend files to droplet
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT }}
+          source: "backend/*"
+          target: "/var/calorificServer"
+          strip_components: 1
+          overwrite: true
+
+      - name: Install backend dependencies and restart PM2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          port: ${{ secrets.DROPLET_PORT }}
+          script_stop: true
+          script: |
+            set -e
+
+            cd /var/calorificServer
+
+            echo "Installing backend dependencies..."
+            npm ci --omit=dev
+
+            echo "Ensuring PM2 is installed..."
+            command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+
+            echo "Restarting backend..."
+            pm2 reload calorific-backend --update-env || pm2 start server.js --name calorific-backend
+
+            echo "Saving PM2 process list..."
+            pm2 save
+
+            echo "Reloading Nginx..."
+            nginx -t
+            systemctl reload nginx
+
+            echo "Deployment complete."
