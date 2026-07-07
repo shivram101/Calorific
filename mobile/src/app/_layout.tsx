@@ -1,13 +1,19 @@
-import "../global.css"
+// src/app/_layout.tsx
+// UPDATED: Added all new screens to the Stack navigator.
+
+import "../global.css";
 import { Stack } from "expo-router";
 
 export default function RootLayout() {
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: "Welcome to Calorific!" }} />
-      <Stack.Screen name="login" options={{ title: "Login" }} />
-      <Stack.Screen name="signup" options={{ title: "Sign Up" }} />
-      <Stack.Screen name="onboarding" options={{ title: "Onboarding" }} />
+      <Stack.Screen name="index" options={{ title: "Calorific", headerShown: false }} />
+      <Stack.Screen name="login" options={{ title: "Log in", headerShown: false }} />
+      <Stack.Screen name="signup" options={{ title: "Sign Up", headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ title: "Get Started", headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ title: "Reset Password", headerShown: false }} />
+      <Stack.Screen name="diary" options={{ title: "Diary", headerShown: false }} />
+      <Stack.Screen name="barcode" options={{ title: "Scan Barcode", headerShown: false, presentation: "modal" }} />
     </Stack>
   );
 }

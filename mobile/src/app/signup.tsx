@@ -1,3 +1,8 @@
+// src/app/signup.tsx
+// FIXED: Was sending `name` as one field — API expects `firstName` + `lastName`.
+// Also was checking `data.message` for errors instead of throwing from client.
+// Now uses centralized API client.
+
 import { useState } from "react";
 import {
   View,
@@ -10,8 +15,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Link } from "expo-router";
+import { register } from "../api/client";
 
-// Web-frontend equivalent: SignUpPage.tsx
 export default function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,21 +35,17 @@ export default function Signup() {
       return;
     }
 
+    // Split "John Doe" → firstName: "John", lastName: "Doe"
+    const parts = name.trim().split(" ");
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || "";
+
     setSubmitting(true);
     try {
-      const res = await fetch("http://localhost:5000/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Registration failed");
-      } else {
-        setSuccess("Account created! Please check your email to verify.");
-      }
-    } catch (err) {
-      setError("Server error. Please try again.");
+      await register(email, password, firstName, lastName);
+      setSuccess("Account created! Please check your email to verify.");
+    } catch (err: any) {
+      setError(err.message || "Registration failed");
     } finally {
       setSubmitting(false);
     }
@@ -56,24 +57,9 @@ export default function Signup() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       {/* Decorative background emoji */}
-      <Text
-        className="absolute text-[110px] opacity-50"
-        style={{ top: -30, left: -30 }}
-      >
-        🍃
-      </Text>
-      <Text
-        className="absolute text-[90px] opacity-50"
-        style={{ bottom: -20, right: -10 }}
-      >
-        🥑
-      </Text>
-      <Text
-        className="absolute text-[50px] opacity-30"
-        style={{ top: "10%", right: "12%" }}
-      >
-        🍓
-      </Text>
+      <Text className="absolute text-[110px] opacity-50" style={{ top: -30, left: -30 }}>🍃</Text>
+      <Text className="absolute text-[90px] opacity-50" style={{ bottom: -20, right: -10 }}>🥑</Text>
+      <Text className="absolute text-[50px] opacity-30" style={{ top: "10%", right: "12%" }}>🍓</Text>
 
       <ScrollView
         className="flex-1"
@@ -81,7 +67,6 @@ export default function Signup() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="px-6 py-14 items-center">
-          {/* Card */}
           <View
             className="w-full max-w-[380px] bg-white rounded-3xl px-[26px] py-10"
             style={{
@@ -95,12 +80,8 @@ export default function Signup() {
             {/* Logo */}
             <View className="items-center mb-6">
               <Text className="text-4xl mb-2">🥗</Text>
-              <Text className="text-xl font-semibold text-[#2D2A26]">
-                Calorific
-              </Text>
-              <Text className="text-xs text-[#8A8378] mt-1">
-                Create your account
-              </Text>
+              <Text className="text-xl font-semibold text-[#2D2A26]">Calorific</Text>
+              <Text className="text-xs text-[#8A8378] mt-1">Create your account</Text>
             </View>
 
             {/* Error banner */}
@@ -118,9 +99,7 @@ export default function Signup() {
             )}
 
             {/* Full name */}
-            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">
-              Full name
-            </Text>
+            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">Full name</Text>
             <View className="flex-row items-center bg-[#FFF8ED] rounded-xl px-3.5 mb-3.5">
               <Ionicons name="person-outline" size={15} color="#b5ac9d" />
               <TextInput
@@ -133,9 +112,7 @@ export default function Signup() {
             </View>
 
             {/* Email */}
-            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">
-              Email address
-            </Text>
+            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">Email address</Text>
             <View className="flex-row items-center bg-[#FFF8ED] rounded-xl px-3.5 mb-3.5">
               <Ionicons name="mail-outline" size={15} color="#b5ac9d" />
               <TextInput
@@ -151,10 +128,8 @@ export default function Signup() {
             </View>
 
             {/* Password */}
-            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">
-              Password
-            </Text>
-            <View className="flex-row items-center bg-[#FFF8ED] rounded-xl px-3.5 mb-5">
+            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">Password</Text>
+            <View className="flex-row items-center bg-[#FFF8ED] rounded-xl px-3.5 mb-3.5">
               <Ionicons name="lock-closed-outline" size={15} color="#b5ac9d" />
               <TextInput
                 value={password}
@@ -169,9 +144,7 @@ export default function Signup() {
             </View>
 
             {/* Confirm password */}
-            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">
-              Confirm password
-            </Text>
+            <Text className="text-xs font-medium text-[#2D2A26] mb-1.5">Confirm password</Text>
             <View className="flex-row items-center bg-[#FFF8ED] rounded-xl px-3.5 mb-5">
               <Ionicons name="lock-closed-outline" size={15} color="#b5ac9d" />
               <TextInput
@@ -207,14 +180,10 @@ export default function Signup() {
 
             {/* Login link */}
             <View className="flex-row justify-center mt-5">
-              <Text className="text-[13px] text-[#8A8378]">
-                Already have an account?{" "}
-              </Text>
+              <Text className="text-[13px] text-[#8A8378]">Already have an account? </Text>
               <Link href="/login" asChild>
                 <TouchableOpacity>
-                  <Text className="text-[13px] font-semibold text-[#1FA873]">
-                    Log In
-                  </Text>
+                  <Text className="text-[13px] font-semibold text-[#1FA873]">Log In</Text>
                 </TouchableOpacity>
               </Link>
             </View>

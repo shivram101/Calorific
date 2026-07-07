@@ -1,4 +1,8 @@
-import { Link } from "expo-router";
+// src/app/login.tsx
+// UPDATED: Replaced console.log placeholder with real login() API call.
+// On success stores JWT via AsyncStorage and navigates to diary.
+
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   View,
@@ -8,18 +12,32 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
+import { login } from "../api/client";
 
-// Web-frontend equivalent: LoginPage.tsx
 export default function Login() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    // TODO: wire up to auth logic
-    console.log("Logging in with", { email, password });
-  };
+  async function handleLogin() {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter your email and password");
+      return;
+    }
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.replace("/diary");
+    } catch (err: any) {
+      Alert.alert("Login failed", err.message || "Invalid email or password");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <KeyboardAvoidingView
@@ -97,20 +115,22 @@ export default function Login() {
               </TouchableOpacity>
             </View>
 
-            {/* Forgot password link, TODO: have a forgot password screen */}
-            <TouchableOpacity className="self-end mb-5">
-              <Text className="text-xs font-semibold text-[#8A8378]">
-                <Link href="/"> 
+            {/* Forgot password */}
+            <Link href="/forgot-password" asChild>
+              <TouchableOpacity className="self-end mb-5">
+                <Text className="text-xs font-semibold text-[#8A8378]">
                   Forgot password?
-                </Link>
-              </Text>
-            </TouchableOpacity>
+                </Text>
+              </TouchableOpacity>
+            </Link>
 
-            {/* Log in button  TODO: enter dashboard screen */}
+            {/* Log in button */}
             <TouchableOpacity
               onPress={handleLogin}
+              disabled={loading}
               className="bg-[#1FA873] rounded-2xl py-3.5 items-center mb-5"
               style={{
+                opacity: loading ? 0.7 : 1,
                 shadowColor: "#1FA873",
                 shadowOpacity: 0.3,
                 shadowRadius: 16,
@@ -119,18 +139,14 @@ export default function Login() {
               }}
             >
               <Text className="text-white text-sm font-semibold">
-                <Link href="/">
-                  Log in
-                </Link>
+                {loading ? "Logging in..." : "Log in"}
               </Text>
             </TouchableOpacity>
 
             {/* Divider */}
             <View className="flex-row items-center mb-5">
               <View className="flex-1 h-[1px] bg-[#E3E8E5]" />
-              <Text className="text-[10px] text-[#8A8378] mx-3">
-                or
-              </Text>
+              <Text className="text-[10px] text-[#8A8378] mx-3">or</Text>
               <View className="flex-1 h-[1px] bg-[#E3E8E5]" />
             </View>
 
@@ -139,13 +155,13 @@ export default function Login() {
               <Text className="text-xs text-[#8A8378]">
                 Don't have an account?{" "}
               </Text>
-              <TouchableOpacity>
-                <Text className="text-xs font-semibold text-[#1FA873]">
-                  <Link href="/signup">
+              <Link href="/signup" asChild>
+                <TouchableOpacity>
+                  <Text className="text-xs font-semibold text-[#1FA873]">
                     Sign up
-                  </Link>
-                </Text>
-              </TouchableOpacity>
+                  </Text>
+                </TouchableOpacity>
+              </Link>
             </View>
           </View>
         </View>

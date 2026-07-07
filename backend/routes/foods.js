@@ -56,6 +56,83 @@ router.get("/foods/search", requireAuth, async (req, res) => {
   }
 });
 
+// ---------- GET /api/foods/barcode/:upc ----------
+// Dedicated barcode/UPC lookup — more reliable than general search for packaged foods.
+// Filters to Branded dataType only (branded foods are the ones with UPC codes)
+// and requests only 1 result, then caches and returns it.
+// MUST be defined before /foods/:id or Express will match "barcode" as an id.
+router.get("/foods/barcode/:upc", requireAuth, async (req, res) => {
+  try {
+    const { upc } = req.params;
+    if (!upc || upc.trim().length === 0) {
+      return res.status(400).json({ error: "UPC is required" });
+    }
+
+    const FDC_BASE_URL = "https://api.nal.usda.gov/fdc/v1";
+    const FDC_API_KEY = process.env.FDC_API_KEY;
+
+    if (!FDC_API_KEY) {
+      return res.status(500).json({ error: "FDC_API_KEY is not configured" });
+    }
+
+    const url = `${FDC_BASE_URL}/foods/search?query=${encodeURIComponent(upc.trim())}&pageSize=1&dataType=Branded&api_key=${FDC_API_KEY}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      return res.status(502).json({ error: "FDC API request failed" });
+    }
+
+    const data = await response.json();
+    const fdcFoods = data.foods || [];
+
+    if (fdcFoods.length === 0) {
+      return res.status(404).json({ error: "No food found for this barcode" });
+    }
+
+    // Normalize using the same shape as searchFDC results
+    const { searchFDC } = require("../fdcService");
+    const NUTRIENT_IDS = { CALORIES: 1008, PROTEIN: 1003, FAT: 1004, CARBS: 1005 };
+
+    function extractNutrient(foodNutrients, nutrientId) {
+      if (!Array.isArray(foodNutrients)) return 0;
+      const match = foodNutrients.find(
+        (n) => n.nutrient?.id === nutrientId || n.nutrientId === nutrientId
+      );
+      return match ? (match.amount ?? match.value ?? 0) : 0;
+    }
+
+    const fdcFood = fdcFoods[0];
+    const normalized = {
+      source: "fdc",
+      fdcId: fdcFood.fdcId,
+      name: fdcFood.description,
+      brand: fdcFood.brandOwner || fdcFood.brandName || null,
+      servingSize: fdcFood.servingSize || 100,
+      servingSizeUnit: fdcFood.servingSizeUnit || "g",
+      calories: extractNutrient(fdcFood.foodNutrients, NUTRIENT_IDS.CALORIES),
+      protein: extractNutrient(fdcFood.foodNutrients, NUTRIENT_IDS.PROTEIN),
+      fat: extractNutrient(fdcFood.foodNutrients, NUTRIENT_IDS.FAT),
+      carbs: extractNutrient(fdcFood.foodNutrients, NUTRIENT_IDS.CARBS),
+      cachedAt: new Date(),
+    };
+
+    // Cache in MongoDB so repeat scans of the same barcode don't hit FDC again
+    const db = getDB();
+    const foods = db.collection("foods");
+    await foods.updateOne(
+      { source: "fdc", fdcId: normalized.fdcId },
+      { $set: normalized },
+      { upsert: true }
+    );
+
+    const saved = await foods.findOne({ source: "fdc", fdcId: normalized.fdcId });
+    return res.status(200).json(saved);
+  } catch (err) {
+    console.error("Barcode lookup error:", err);
+    return res.status(500).json({ error: "Server error during barcode lookup" });
+  }
+});
+
 // ---------- GET /api/foods/:id ----------
 // :id is a Mongo _id (works for both cached FDC foods and custom foods)
 router.get("/foods/:id", requireAuth, async (req, res) => {
