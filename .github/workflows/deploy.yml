@@ -117,7 +117,7 @@ jobs:
             cd /var/calorificServer
 
             echo "Installing backend dependencies..."
-            npm ci --omit=dev
+            npm install --omit=dev
 
             echo "Installing PM2 if needed..."
             if ! command -v pm2 >/dev/null 2>&1; then
