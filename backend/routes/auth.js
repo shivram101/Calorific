@@ -58,6 +58,7 @@ router.post("/register", async (req, res) => {
       sex: null,
       activityLevel: null,
       goal: null,
+      age: null,
       createdAt: new Date(),
     };
 

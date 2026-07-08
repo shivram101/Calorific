@@ -37,8 +37,8 @@ router.get("/profile", requireAuth, async (req, res) => {
 router.put("/profile", requireAuth, async (req, res) => {
   try {
     const allowedFields = [
-      "firstName", "lastName", "heightCm", "weightKg", "sex", "activityLevel", "goal",
-    ];
+  "firstName", "lastName", "heightCm", "weightKg", "sex", "activityLevel", "goal", "age",
+  ];
 
     const updates = {};
     for (const field of allowedFields) {
