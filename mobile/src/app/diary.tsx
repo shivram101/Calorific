@@ -23,11 +23,13 @@ import {
   searchFoods,
   getWater,
   addWater,
+  getTargets,
   logout,
   todayString,
   type Food,
   type LogEntry,
   type Meal,
+  type Targets,
 } from "../api/client";
 
 const MEALS: Meal[] = ["breakfast", "lunch", "dinner", "snack"];
@@ -46,6 +48,7 @@ export default function Diary() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [totals, setTotals] = useState({ calories: 0, protein: 0, fat: 0, carbs: 0 });
   const [waterMl, setWaterMl] = useState(0);
+  const [targets, setTargets] = useState<Targets | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Search state
@@ -62,13 +65,15 @@ export default function Diary() {
 
   const loadDiary = useCallback(async () => {
     try {
-      const [log, water] = await Promise.all([
+      const [log, water, t] = await Promise.all([
         getLogs(TODAY),
         getWater(TODAY),
+        getTargets(),
       ]);
       setEntries(log.entries);
       setTotals(log.totals);
       setWaterMl(water.totalMl);
+      setTargets(t);
     } catch (err: any) {
       if (err.message?.includes("Invalid or expired token")) {
         await logout();
@@ -175,6 +180,12 @@ export default function Diary() {
             <Text className="text-xl font-bold text-[#2D2A26]">Diary</Text>
           </View>
           <View className="flex-row gap-3 items-center">
+            <TouchableOpacity onPress={() => router.push("/goals")} className="bg-[#E1F5EE] p-2 rounded-xl">
+              <Ionicons name="flag-outline" size={20} color="#1FA873" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/trends")} className="bg-[#E1F5EE] p-2 rounded-xl">
+              <Ionicons name="trending-up-outline" size={20} color="#1FA873" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => router.push("/barcode")} className="bg-[#E1F5EE] p-2 rounded-xl">
               <Ionicons name="barcode-outline" size={20} color="#1FA873" />
             </TouchableOpacity>
@@ -184,21 +195,33 @@ export default function Diary() {
           </View>
         </View>
 
-        {/* Calorie summary */}
-        <View className="bg-[#F0FBF6] rounded-2xl p-4">
-          <View className="flex-row justify-between items-center mb-3">
-            <Text className="text-sm font-semibold text-[#2D2A26]">Calories</Text>
-            <Text className="text-2xl font-bold text-[#1FA873]">{totals.calories}</Text>
-          </View>
-          <View className="flex-row justify-between">
+        {/* THE NUMBER — plain-numbers-first summary (Zack's design) */}
+        <View className="bg-[#F0FBF6] rounded-2xl p-4 items-center">
+          <Text className="text-[44px] font-bold text-[#2D2A26] leading-none">
+            {totals.calories.toLocaleString()}
+          </Text>
+          <Text className="text-[11px] text-[#8A8378] mt-1">
+            {targets ? `of ${targets.calorieTarget.toLocaleString()} kcal today` : "kcal today"}
+          </Text>
+          {targets && (
+            <View className="w-3/5 h-1.5 bg-white rounded-full mt-2 overflow-hidden">
+              <View
+                className="h-full bg-[#1FA873] rounded-full"
+                style={{ width: `${Math.min((totals.calories / targets.calorieTarget) * 100, 100)}%` }}
+              />
+            </View>
+          )}
+          <View className="flex-row justify-between w-full mt-3">
             {[
-              { label: "Protein", value: totals.protein, color: "#DC4C3F" },
-              { label: "Carbs", value: totals.carbs, color: "#EF9F27" },
-              { label: "Fat", value: totals.fat, color: "#378ADD" },
-            ].map(({ label, value, color }) => (
+              { label: "Protein", value: totals.protein, target: targets?.proteinTarget, color: "#DC4C3F" },
+              { label: "Carbs", value: totals.carbs, target: targets?.carbTarget, color: "#EF9F27" },
+              { label: "Fat", value: totals.fat, target: targets?.fatTarget, color: "#378ADD" },
+            ].map(({ label, value, target, color }) => (
               <View key={label} className="items-center">
                 <Text style={{ fontSize: 16, fontWeight: "700", color }}>{value}g</Text>
-                <Text className="text-[10px] text-[#8A8378] mt-0.5">{label}</Text>
+                <Text className="text-[10px] text-[#8A8378] mt-0.5">
+                  {target ? `${label} / ${target}g` : label}
+                </Text>
               </View>
             ))}
           </View>
@@ -206,6 +229,25 @@ export default function Diary() {
       </View>
 
       <ScrollView className="flex-1 px-4 pt-4">
+        {/* Goals nudge — only when none are set (opt-in philosophy) */}
+        {!targets && (
+          <TouchableOpacity
+            onPress={() => router.push("/goals")}
+            className="rounded-2xl px-4 py-3.5 mb-4 flex-row justify-between items-center"
+            style={{ borderWidth: 1.5, borderColor: "#D5DDD8", borderStyle: "dashed" }}
+          >
+            <View className="flex-1 pr-3">
+              <Text className="text-sm font-bold text-[#2D2A26]">No goals set</Text>
+              <Text className="text-[11px] text-[#8A8378] mt-0.5">
+                Track freely, or set targets to see progress.
+              </Text>
+            </View>
+            <View className="bg-[#1FA873] px-3.5 py-2 rounded-xl">
+              <Text className="text-white text-xs font-bold">Set up</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* Water tracker */}
         <View className="bg-white rounded-2xl p-4 mb-4" style={{ shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 8, elevation: 1 }}>
           <View className="flex-row justify-between items-center mb-3">

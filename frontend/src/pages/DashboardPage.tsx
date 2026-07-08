@@ -160,6 +160,7 @@ function DashboardPage() {
           <div style={styles.brand}>Calorific</div>
           <div style={styles.ribbonItem}>Log</div>
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/goals')}>Goals</div>
+          <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
           <div style={styles.ribbonItemMuted}>Settings</div>
         </div>
         <div style={styles.ribbonRight}>
