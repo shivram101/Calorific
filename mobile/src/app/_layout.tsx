@@ -14,6 +14,9 @@ export default function RootLayout() {
       <Stack.Screen name="forgot-password" options={{ title: "Reset Password", headerShown: false }} />
       <Stack.Screen name="diary" options={{ title: "Diary", headerShown: false }} />
       <Stack.Screen name="barcode" options={{ title: "Scan Barcode", headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="trends" options={{ title: "Trends", headerShown: false }} />
+      <Stack.Screen name="goals" options={{ title: "Goals", headerShown: false }} />
+      <Stack.Screen name="dashboard" options={{ title: "Dashboard", headerShown: false }} />
     </Stack>
   );
 }

@@ -12,6 +12,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
 import DashboardPage from './pages/DashboardPage';
 import GoalsPage from './pages/GoalsPage';
+import ProgressPage from './pages/ProgressPage';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
         <Route path="/Dashboard" element={<DashboardPage />} />
         <Route path="/goals" element={<GoalsPage />} />
+        <Route path="/progress" element={<ProgressPage />} />
       </Routes>
     </Router>
   );

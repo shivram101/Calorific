@@ -281,3 +281,16 @@ export async function logWeight(weightKg: number, date?: string): Promise<Weight
 export async function getWeightHistory(range = 30): Promise<{ range: number; entries: WeightEntry[] }> {
   return request('GET', `/progress/weight?range=${range}`);
 }
+
+// Mirrors the web client — daily calorie/macro totals for the Trends screen.
+export interface DailySummary {
+  date: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+}
+
+export async function getProgressSummary(range = 30): Promise<{ range: number; summary: DailySummary[] }> {
+  return request('GET', `/progress/summary?range=${range}`);
+}
