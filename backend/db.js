@@ -24,7 +24,7 @@ let db;
 async function connectDB() {
   if (db) return db;
   await client.connect();
-  db = client.db("CALORIFIC_DB");
+  db = client.db("Calorific_DB");
   console.log("Connected to MongoDB (calorific database)");
   return db;
 }
