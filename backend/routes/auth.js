@@ -84,6 +84,8 @@ router.get("/verify-email/:token", async (req, res) => {
     const users = db.collection("users");
 
     const user = await users.findOne({ verificationToken: token });
+        console.log("User found:", user ? user.email : "NOT FOUND"); // ADD THIS
+
     if (!user) {
       return res.status(400).json({ error: "Invalid or expired verification link" });
     }

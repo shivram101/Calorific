@@ -17,6 +17,9 @@ export default function RootLayout() {
       <Stack.Screen name="trends" options={{ title: "Trends", headerShown: false }} />
       <Stack.Screen name="goals" options={{ title: "Goals", headerShown: false }} />
       <Stack.Screen name="dashboard" options={{ title: "Dashboard", headerShown: false }} />
+      <Stack.Screen name="food-detail" options={{ title: "Food Detail", headerShown: false }} />
+      <Stack.Screen name="custom-food" options={{ title: "New Food", headerShown: false }} />
+      <Stack.Screen name="settings" options={{ title: "Settings", headerShown: false }} />
     </Stack>
   );
 }

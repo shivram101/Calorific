@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="mobile-new-screens">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/mobile-new-screens.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

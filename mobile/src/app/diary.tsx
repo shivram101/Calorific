@@ -189,9 +189,12 @@ export default function Diary() {
             <TouchableOpacity onPress={() => router.push("/barcode")} className="bg-[#E1F5EE] p-2 rounded-xl">
               <Ionicons name="barcode-outline" size={20} color="#1FA873" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={22} color="#8A8378" />
-            </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push("/settings")} className="bg-[#E1F5EE] p-2 rounded-xl">
+     <Ionicons name="settings-outline" size={20} color="#1FA873" />
+        </TouchableOpacity>
+<TouchableOpacity onPress={handleLogout}>
+        <Ionicons name="log-out-outline" size={22} color="#8A8378" />
+        </TouchableOpacity>
           </View>
         </View>
 
@@ -346,12 +349,18 @@ export default function Diary() {
                   <Ionicons name="search" size={18} color="white" />
                 )}
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push("/barcode")}
-                className="bg-[#E1F5EE] rounded-xl px-3 items-center justify-center"
-              >
-                <Ionicons name="barcode-outline" size={20} color="#1FA873" />
-              </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push("/barcode")}
+              className="bg-[#E1F5EE] rounded-xl px-3 items-center justify-center"
+            >
+              <Ionicons name="barcode-outline" size={20} color="#1FA873" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => { setShowSearch(false); router.push("/custom-food"); }}
+              className="bg-[#E1F5EE] rounded-xl px-3 items-center justify-center"
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#1FA873" />
+            </TouchableOpacity>
             </View>
           </View>
 
