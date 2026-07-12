@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { resetPassword } from '../api/client';
 
 function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
+  const { token } = useParams<{ token: string }>();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,31 +13,27 @@ function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords don't match");
       return;
     }
 
-    const token = searchParams.get('token');
     if (!token) {
       setError('Missing or invalid reset link');
       return;
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Something went wrong');
-      } else {
-        setSuccess(true);
-      }
-    } catch (err) {
-      setError('Server error. Please try again.');
+      // Calls POST /api/reset-password/:token with { newPassword } — matches the backend
+      await resetPassword(token, password);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
     }
   }
 
