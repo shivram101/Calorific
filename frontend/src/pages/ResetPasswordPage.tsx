@@ -1,8 +1,13 @@
+// src/pages/ResetPasswordPage.tsx
+// FIXED: Was reading token as ?token= query param — API expects it as path param.
+// Also updated to use centralized API client and check data.error not data.message.
+
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { resetPassword } from '../api/client';
 
 function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
+  const { token } = useParams<{ token: string }>();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,26 +22,16 @@ function ResetPasswordPage() {
       return;
     }
 
-    const token = searchParams.get('token');
     if (!token) {
       setError('Missing or invalid reset link');
       return;
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Something went wrong');
-      } else {
-        setSuccess(true);
-      }
-    } catch (err) {
-      setError('Server error. Please try again.');
+      await resetPassword(token, password);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong');
     }
   }
 
