@@ -1,44 +1,55 @@
+// src/pages/SettingsPage.tsx
+// Uses the centralized API client (getProfile / updateProfile / deleteAccount / logout).
+// Backend field names: heightCm, weightKg, age (number), goal is lowercase 'lose'|'maintain'|'gain'.
+
 import { useEffect, useState } from 'react';
+import { getProfile, updateProfile, deleteAccount, logout } from '../api/client';
+
+type GoalType = 'lose' | 'maintain' | 'gain';
+
+const GOAL_OPTIONS: { value: GoalType; label: string; icon: string }[] = [
+  { value: 'lose', label: 'Lose', icon: 'ti-trending-down' },
+  { value: 'maintain', label: 'Maintain', icon: 'ti-scale' },
+  { value: 'gain', label: 'Gain', icon: 'ti-trending-up' },
+];
 
 function SettingsPage() {
   const [email, setEmail] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
-  const [goal, setGoal] = useState('');
+  const [goal, setGoal] = useState<GoalType | ''>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await fetch('http://localhost:5000/api/profile', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (res.ok) {
-          setEmail(data.email || '');
-          setFirstName(data.firstName || '');
-          setLastName(data.lastName || '');
-          setAge(data.age || '');
-          setHeight(data.height || '');
-          setWeight(data.weight || '');
-          setActivityLevel(data.activityLevel || '');
-          setGoal(data.goal || '');
+    getProfile()
+      .then(data => {
+        setEmail(data.email || '');
+        setIsVerified(!!data.isVerified);
+        setFirstName(data.firstName || '');
+        setLastName(data.lastName || '');
+        setAge(data.age != null ? String(data.age) : '');
+        setHeight(data.heightCm != null ? String(data.heightCm) : '');
+        setWeight(data.weightKg != null ? String(data.weightKg) : '');
+        setActivityLevel(data.activityLevel || '');
+        setGoal((data.goal as GoalType) || '');
+      })
+      .catch((err: any) => {
+        if (err.message?.includes('Invalid or expired token')) {
+          logout(); // clears token and redirects to /login
+        } else {
+          setError('Could not load profile.');
         }
-      } catch (err) {
-        setError('Could not load profile.');
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadProfile();
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSave() {
@@ -46,31 +57,37 @@ function SettingsPage() {
     setMessage('');
     setError('');
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:5000/api/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ firstName, lastName, age, height, weight, activityLevel, goal }),
+      await updateProfile({
+        firstName,
+        lastName,
+        age: age !== '' ? Number(age) : null,
+        heightCm: height !== '' ? Number(height) : null,
+        weightKg: weight !== '' ? Number(weight) : null,
+        activityLevel: activityLevel || null,
+        goal: goal || null,
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || 'Could not save changes.');
-      } else {
-        setMessage('Changes saved!');
-      }
-    } catch (err) {
-      setError('Server error. Please try again.');
+      setMessage('Changes saved!');
+    } catch (err: any) {
+      setError(err.message || 'Could not save changes.');
     } finally {
       setSaving(false);
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm(
+      'Delete your account? This permanently removes your profile, food logs, water logs, weight history, and targets. This cannot be undone.'
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await deleteAccount();
+      logout(); // clears token and redirects to /login
+    } catch (err: any) {
+      setError(err.message || 'Could not delete account.');
+      setDeleting(false);
+    }
   }
 
   const cardStyle = {
@@ -125,7 +142,7 @@ function SettingsPage() {
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
-          <a href="/dashboard" style={{ fontSize: '18px', color: '#2D2A26', textDecoration: 'none' }}>
+          <a href="/dashboard" style={{ fontSize: '18px', color: '#2D2A26', textDecoration: 'none' }} aria-label="Back to dashboard">
             <i className="ti ti-arrow-left" aria-hidden="true"></i>
           </a>
           <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Settings</h1>
@@ -137,7 +154,7 @@ function SettingsPage() {
           </div>
         )}
         {error && (
-          <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#DC4C3F', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
+          <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
             {error}
           </div>
         )}
@@ -149,10 +166,17 @@ function SettingsPage() {
             <i className="ti ti-mail" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
             <span style={{ fontSize: '13px', color: '#2D2A26' }}>{email}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#1FA873', fontWeight: 500 }}>
-            <i className="ti ti-circle-check" aria-hidden="true"></i>
-            Email verified
-          </div>
+          {isVerified ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#1FA873', fontWeight: 500 }}>
+              <i className="ti ti-circle-check" aria-hidden="true"></i>
+              Email verified
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#c24337', fontWeight: 500 }}>
+              <i className="ti ti-alert-circle" aria-hidden="true"></i>
+              Email not verified — check your inbox
+            </div>
+          )}
         </div>
 
         {/* Profile */}
@@ -161,29 +185,30 @@ function SettingsPage() {
 
           <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>First name</label>
-              <input style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} />
+              <label style={labelStyle} htmlFor="settings-first-name">First name</label>
+              <input id="settings-first-name" style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Last name</label>
-              <input style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} />
+              <label style={labelStyle} htmlFor="settings-last-name">Last name</label>
+              <input id="settings-last-name" style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} />
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Age</label>
-              <input type="number" style={inputStyle} value={age} onChange={e => setAge(e.target.value)} />
+              <label style={labelStyle} htmlFor="settings-age">Age</label>
+              <input id="settings-age" type="number" style={inputStyle} value={age} onChange={e => setAge(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Height (cm)</label>
-              <input type="number" style={inputStyle} value={height} onChange={e => setHeight(e.target.value)} />
+              <label style={labelStyle} htmlFor="settings-height">Height (cm)</label>
+              <input id="settings-height" type="number" style={inputStyle} value={height} onChange={e => setHeight(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Weight (kg)</label>
-              <input type="number" style={inputStyle} value={weight} onChange={e => setWeight(e.target.value)} />
+              <label style={labelStyle} htmlFor="settings-weight">Weight (kg)</label>
+              <input id="settings-weight" type="number" style={inputStyle} value={weight} onChange={e => setWeight(e.target.value)} />
             </div>
           </div>
+
         </div>
 
         {/* Activity level */}
@@ -226,14 +251,10 @@ function SettingsPage() {
         <div style={cardStyle}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Goal</div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            {[
-              { label: 'Lose', icon: 'ti-trending-down' },
-              { label: 'Maintain', icon: 'ti-scale' },
-              { label: 'Gain', icon: 'ti-trending-up' },
-            ].map(({ label, icon }) => (
-              <div key={label} style={tileStyle(goal === label)} onClick={() => setGoal(label)}>
-                <i className={`ti ${icon}`} style={{ fontSize: '20px' }} aria-hidden="true"></i>
-                <div style={tileLabelStyle(goal === label)}>{label}</div>
+            {GOAL_OPTIONS.map(({ value, label, icon }) => (
+              <div key={value} style={tileStyle(goal === value)} onClick={() => setGoal(value)}>
+                <i className={`ti ${icon}`} style={{ fontSize: '20px', color: goal === value ? '#fff' : '#2D2A26' }} aria-hidden="true"></i>
+                <div style={tileLabelStyle(goal === value)}>{label}</div>
               </div>
             ))}
           </div>
@@ -261,7 +282,7 @@ function SettingsPage() {
         </button>
 
         <button
-          onClick={handleLogout}
+          onClick={() => logout()}
           style={{
             width: '100%',
             background: '#ffffff',
@@ -276,11 +297,37 @@ function SettingsPage() {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '8px',
+            marginBottom: '28px',
           }}
         >
           <i className="ti ti-logout" aria-hidden="true"></i>
           Log out
         </button>
+
+        {/* Danger zone */}
+        <div style={{ ...cardStyle, border: '1px solid #F3D9D5' }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#c24337', marginBottom: '6px' }}>Danger zone</div>
+          <p style={{ fontSize: '12px', color: '#8A8378', margin: '0 0 14px 0', lineHeight: 1.5 }}>
+            Permanently delete your account and all logged data. This cannot be undone.
+          </p>
+          <button
+            onClick={handleDeleteAccount}
+            disabled={deleting}
+            style={{
+              width: '100%',
+              background: '#FDF0EE',
+              color: '#c24337',
+              border: '1px solid #DC4C3F',
+              borderRadius: '14px',
+              padding: '13px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {deleting ? 'Deleting...' : 'Delete account'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -141,6 +141,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   isVerified: boolean;
+  age: number | null;
   heightCm: number | null;
   weightKg: number | null;
   sex: string | null;
@@ -154,7 +155,7 @@ export async function getProfile(): Promise<UserProfile> {
 }
 
 export async function updateProfile(
-  updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
+  updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'age' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
 ): Promise<{ message: string; updates: typeof updates }> {
   return request('PUT', '/profile', { body: updates });
 }
