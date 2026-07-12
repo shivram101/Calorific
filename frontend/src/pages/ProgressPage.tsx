@@ -172,13 +172,13 @@ function ProgressPage() {
         weightChange !== null
           ? `${weightChange > 0 ? '+' : ''}${disp(Math.abs(weightChange)) * Math.sign(weightChange || 1)} ${unit}`
           : '—',
-      color: weightChange !== null && weightChange < 0 ? '#1FA873' : undefined,
+      color: weightChange !== null && weightChange < 0 ? '#188159' : undefined,
     },
     { label: 'Avg calories', value: avgCalories ? avgCalories.toLocaleString() : '—' },
     {
       label: 'On target',
       value: adherence !== null ? `${adherence}%` : '—',
-      color: '#1FA873',
+      color: '#188159',
     },
   ];
 
@@ -200,7 +200,7 @@ function ProgressPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#DC4C3F', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
+        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
           {error}
         </div>
       )}
@@ -239,7 +239,7 @@ function ProgressPage() {
 
       {loading ? (
         <div style={styles.card}>
-          <div style={{ color: '#8A8378', fontSize: 13, padding: 20, textAlign: 'center' }}>
+          <div style={{ color: '#777167', fontSize: 13, padding: 20, textAlign: 'center' }}>
             Loading your trends...
           </div>
         </div>
@@ -296,15 +296,15 @@ function ProgressPage() {
                 {selectedDay && selectedDay.calories > 0 ? (
                   <div style={styles.dayDetailStats}>
                     <span style={{ fontWeight: 700, color: '#2D2A26' }}>{selectedDay.calories.toLocaleString()} kcal</span>
-                    <span style={{ color: '#DC4C3F' }}>{selectedDay.protein}g P</span>
-                    <span style={{ color: '#EF9F27' }}>{selectedDay.carbs}g C</span>
-                    <span style={{ color: '#378ADD' }}>{selectedDay.fat}g F</span>
+                    <span style={{ color: '#c24337' }}>{selectedDay.protein}g P</span>
+                    <span style={{ color: '#9b6719' }}>{selectedDay.carbs}g C</span>
+                    <span style={{ color: '#2e74ba' }}>{selectedDay.fat}g F</span>
                     {selectedWeight !== undefined && (
-                      <span style={{ color: '#8A8378' }}>{disp(selectedWeight)} {unit}</span>
+                      <span style={{ color: '#777167' }}>{disp(selectedWeight)} {unit}</span>
                     )}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#8A8378' }}>
+                  <div style={{ fontSize: 12, color: '#777167' }}>
                     {selectedWeight !== undefined ? `Weighed in: ${disp(selectedWeight)} ${unit} — no food logged` : 'Nothing logged this day'}
                   </div>
                 )}
@@ -322,7 +322,7 @@ function ProgressPage() {
               <div style={styles.cardHeader}>
                 <h2 style={styles.cardTitle}>Weight</h2>
                 {weightChange !== null && weightChange !== 0 && (
-                  <span style={{ ...styles.changeTag, color: weightChange < 0 ? '#1FA873' : '#8A8378' }}>
+                  <span style={{ ...styles.changeTag, color: weightChange < 0 ? '#188159' : '#777167' }}>
                     {weightChange > 0 ? '+' : ''}{disp(Math.abs(weightChange)) * Math.sign(weightChange)} {unit} over {range} days
                   </span>
                 )}
@@ -340,6 +340,7 @@ function ProgressPage() {
                 <input
                   type="number"
                   step="0.1"
+                  aria-label={`Today's weight in ${unit}`}
                   placeholder={`Today's weight (${unit})`}
                   value={weightInput}
                   onChange={e => setWeightInput(e.target.value)}
@@ -372,13 +373,13 @@ function ProgressPage() {
 
             <div style={styles.macroCol}>
               {[
-                { label: 'Avg protein / day', value: avg('protein'), color: '#DC4C3F' },
-                { label: 'Avg carbs / day', value: avg('carbs'), color: '#EF9F27' },
-                { label: 'Avg fat / day', value: avg('fat'), color: '#378ADD' },
+                { label: 'Avg protein / day', value: avg('protein'), color: '#c24337' },
+                { label: 'Avg carbs / day', value: avg('carbs'), color: '#9b6719' },
+                { label: 'Avg fat / day', value: avg('fat'), color: '#2e74ba' },
               ].map(m => (
                 <div key={m.label} style={styles.macroCard}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>{m.value}g</div>
-                  <div style={{ fontSize: 11, color: '#8A8378' }}>{m.label}</div>
+                  <div style={{ fontSize: 11, color: '#777167' }}>{m.label}</div>
                 </div>
               ))}
             </div>
@@ -419,13 +420,13 @@ function CalendarDay({
   const over = logged && target ? day.calories > target * 1.1 : false;
 
   let background = 'transparent';
-  let color = '#8A8378';
+  let color = '#777167';
   if (logged) {
     background = over ? '#FAEEDA' : '#E1F5EE';
     color = over ? '#854F0B' : '#085041';
   }
   if (selected) {
-    background = '#1FA873';
+    background = '#188159';
     color = '#fff';
   }
 
@@ -482,16 +483,16 @@ function WeightChart({ entries }: { entries: WeightEntry[] }) {
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }} role="img"
       aria-label={`Weight trend from ${entries[0].weightKg} to ${entries[entries.length - 1].weightKg} kilograms`}>
       <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#EFE9DE" strokeWidth="1" />
-      <text x={PAD - 6} y={y(max) + 4} textAnchor="end" fontSize="10" fill="#8A8378">{max}</text>
-      <text x={PAD - 6} y={y(min) + 4} textAnchor="end" fontSize="10" fill="#8A8378">{min}</text>
+      <text x={PAD - 6} y={y(max) + 4} textAnchor="end" fontSize="10" fill="#777167">{max}</text>
+      <text x={PAD - 6} y={y(min) + 4} textAnchor="end" fontSize="10" fill="#777167">{min}</text>
       <polyline points={points} fill="none" stroke="#1FA873" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       {entries.map((e, i) => (
         <circle key={e._id} cx={x(i)} cy={y(e.weightKg)} r="3" fill="#1FA873">
           <title>{`${e.date}: ${e.weightKg} kg`}</title>
         </circle>
       ))}
-      <text x={PAD} y={H - PAD + 15} fontSize="10" fill="#8A8378">{fmt(entries[0].date)}</text>
-      <text x={W - PAD} y={H - PAD + 15} textAnchor="end" fontSize="10" fill="#8A8378">
+      <text x={PAD} y={H - PAD + 15} fontSize="10" fill="#777167">{fmt(entries[0].date)}</text>
+      <text x={W - PAD} y={H - PAD + 15} textAnchor="end" fontSize="10" fill="#777167">
         {fmt(entries[entries.length - 1].date)}
       </text>
     </svg>
@@ -528,13 +529,13 @@ function CalorieChart({ days, target }: { days: DailySummary[]; target: number |
         <>
           <line x1={PAD} y1={y(target)} x2={W - PAD} y2={y(target)}
             stroke="#2D2A26" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.5" />
-          <text x={W - PAD} y={y(target) - 5} textAnchor="end" fontSize="10" fill="#8A8378">
+          <text x={W - PAD} y={y(target) - 5} textAnchor="end" fontSize="10" fill="#777167">
             target {target.toLocaleString()}
           </text>
         </>
       )}
-      <text x={PAD} y={H - PAD + 15} fontSize="10" fill="#8A8378">{fmt(days[0].date)}</text>
-      <text x={W - PAD} y={H - PAD + 15} textAnchor="end" fontSize="10" fill="#8A8378">
+      <text x={PAD} y={H - PAD + 15} fontSize="10" fill="#777167">{fmt(days[0].date)}</text>
+      <text x={W - PAD} y={H - PAD + 15} textAnchor="end" fontSize="10" fill="#777167">
         {fmt(days[days.length - 1].date)}
       </text>
     </svg>
@@ -550,21 +551,21 @@ const styles: any = {
   ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand: { fontSize: 16, fontWeight: 700, color: '#2D2A26' },
   ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
-  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#C7C2B8', cursor: 'pointer' },
+  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
-  logoutBtn: { background: '#DC4C3F', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
+  logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
 
   samplePill: { background: '#FAEEDA', border: '1px solid #EF9F27', color: '#854F0B', borderRadius: 12, padding: '10px 16px', fontSize: 13 },
 
   rangeRow: { display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' },
-  rangeBtn: { padding: '7px 14px', borderRadius: 10, border: '1px solid #EFE9DE', background: '#fff', color: '#8A8378', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-  rangeActive: { padding: '7px 14px', borderRadius: 10, border: '1px solid #1FA873', background: '#1FA873', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  rangeBtn: { padding: '7px 14px', borderRadius: 10, border: '1px solid #EFE9DE', background: '#fff', color: '#777167', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  rangeActive: { padding: '7px 14px', borderRadius: 10, border: '1px solid #1FA873', background: '#188159', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
 
   statRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   statCard: { flex: '1 1 140px', background: '#fff', borderRadius: 14, padding: '12px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
   statValue: { fontSize: 20, fontWeight: 700, lineHeight: 1.2 },
-  statLabel: { fontSize: 11, color: '#8A8378', marginTop: 2 },
+  statLabel: { fontSize: 11, color: '#777167', marginTop: 2 },
 
   midRow: { display: 'flex', gap: 15, alignItems: 'stretch', flexWrap: 'wrap' },
 
@@ -573,13 +574,13 @@ const styles: any = {
   calTitle: { fontSize: 13, fontWeight: 700, color: '#2D2A26' },
   calNav: { border: 'none', background: '#FFF8ED', color: '#2D2A26', borderRadius: 8, width: 26, height: 26, cursor: 'pointer', fontSize: 14, fontWeight: 700 },
   calGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 },
-  calDow: { textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#C7C2B8', padding: '2px 0' },
+  calDow: { textAlign: 'center', fontSize: 10, fontWeight: 700, color: '#77746e', padding: '2px 0' },
 
   dayDetail: { marginTop: 10, background: '#FFF8ED', borderRadius: 10, padding: '8px 12px' },
-  dayDetailDate: { fontSize: 11, fontWeight: 700, color: '#8A8378', marginBottom: 2 },
+  dayDetailDate: { fontSize: 11, fontWeight: 700, color: '#777167', marginBottom: 2 },
   dayDetailStats: { display: 'flex', gap: 10, fontSize: 12, fontWeight: 700, flexWrap: 'wrap' },
 
-  calLegend: { display: 'flex', gap: 12, marginTop: 8, fontSize: 10, color: '#8A8378', alignItems: 'center' },
+  calLegend: { display: 'flex', gap: 12, marginTop: 8, fontSize: 10, color: '#777167', alignItems: 'center' },
   legendItem: { display: 'flex', alignItems: 'center', gap: 4 },
   legendSwatch: { width: 10, height: 10, borderRadius: 3, display: 'inline-block' },
   legendDot: { width: 5, height: 5, borderRadius: '50%', background: '#378ADD', display: 'inline-block' },
@@ -587,17 +588,17 @@ const styles: any = {
   chartCard: { flex: '2 1 340px', background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column' },
   cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   cardTitle: { margin: 0, fontSize: 15, color: '#2D2A26' },
-  changeTag: { fontSize: 11, color: '#8A8378', fontWeight: 600 },
+  changeTag: { fontSize: 11, color: '#777167', fontWeight: 600 },
 
-  emptyChart: { color: '#8A8378', fontSize: 12, padding: '24px 10px', textAlign: 'center', background: '#FFF8ED', borderRadius: 12, flex: 1 },
+  emptyChart: { color: '#777167', fontSize: 12, padding: '24px 10px', textAlign: 'center', background: '#FFF8ED', borderRadius: 12, flex: 1 },
 
   weighRow: { display: 'flex', gap: 8, marginTop: 'auto', paddingTop: 10 },
   weighInput: { flex: 1, maxWidth: 200, padding: 9, borderRadius: 10, background: '#FFF8ED', border: '1px solid transparent', fontSize: 12 },
-  weighBtn: { padding: '9px 14px', background: '#1FA873', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 12 },
+  weighBtn: { padding: '9px 14px', background: '#188159', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: 12 },
 
   unitToggle: { display: 'flex', background: '#FFF8ED', borderRadius: 8, padding: 2, gap: 2 },
-  unitBtn: { border: 'none', background: 'transparent', color: '#8A8378', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, cursor: 'pointer' },
-  unitActive: { border: 'none', background: '#1FA873', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, cursor: 'pointer' },
+  unitBtn: { border: 'none', background: 'transparent', color: '#777167', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, cursor: 'pointer' },
+  unitActive: { border: 'none', background: '#188159', color: '#fff', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, cursor: 'pointer' },
 
   macroCol: { flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: 12 },
   macroCard: { flex: 1, background: '#fff', borderRadius: 14, padding: '10px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', justifyContent: 'center' },

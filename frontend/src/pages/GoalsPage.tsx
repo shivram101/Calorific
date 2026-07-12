@@ -100,7 +100,7 @@ function GoalsPage() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#FFF8ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#8A8378' }}>Loading your goals...</p>
+        <p style={{ color: '#777167' }}>Loading your goals...</p>
       </div>
     );
   }
@@ -123,7 +123,7 @@ function GoalsPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#DC4C3F', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
+        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
           {error}
         </div>
       )}
@@ -146,7 +146,7 @@ function GoalsPage() {
       <div style={styles.card}>
         <h2 style={styles.cardTitle}>Daily calorie target</h2>
         <div style={styles.bigInputRow}>
-          <input type="number" value={goals.calories} onChange={e => setField('calories', e.target.value)} style={styles.bigInput} />
+          <input type="number" aria-label="Daily calorie target" value={goals.calories} onChange={e => setField('calories', e.target.value)} style={styles.bigInput} />
           <span style={styles.bigUnit}>kcal / day</span>
         </div>
       </div>
@@ -167,7 +167,7 @@ function GoalsPage() {
                 <div style={styles.macroCardLabel}>{label}</div>
                 <div style={styles.macroCardPct}>{pct(key)}%</div>
                 <div style={styles.macroInputRow}>
-                  <input type="number" value={goals[key]} onChange={e => setField(key, e.target.value)}
+                  <input type="number" aria-label={`${label} target in grams`} value={goals[key]} onChange={e => setField(key, e.target.value)}
                     style={{ ...styles.macroInput, borderColor: color }} />
                   <span style={styles.macroUnit}>g</span>
                 </div>
@@ -193,19 +193,19 @@ const styles: any = {
   ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand: { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
   ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
-  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#C7C2B8', cursor: 'pointer' },
+  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
-  logoutBtn: { background: '#DC4C3F', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
+  logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
   card: { background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
   cardTitle: { margin: '0 0 4px 0', fontSize: 17, fontWeight: 700, color: '#2D2A26' },
-  cardSub: { margin: '0 0 18px 0', fontSize: 13, color: '#8A8378' },
+  cardSub: { margin: '0 0 18px 0', fontSize: 13, color: '#777167' },
   goalRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  goalBtn: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #E8E4DC', background: '#FAFAFA', fontSize: 14, fontWeight: 600, color: '#8A8378', cursor: 'pointer' },
-  goalBtnActive: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #1FA873', background: '#F0FBF6', fontSize: 14, fontWeight: 700, color: '#1FA873', cursor: 'pointer' },
+  goalBtn: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #E8E4DC', background: '#FAFAFA', fontSize: 14, fontWeight: 600, color: '#777167', cursor: 'pointer' },
+  goalBtnActive: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #1FA873', background: '#F0FBF6', fontSize: 14, fontWeight: 700, color: '#188159', cursor: 'pointer' },
   bigInputRow: { display: 'flex', alignItems: 'center', gap: 14 },
   bigInput: { fontSize: 36, fontWeight: 700, color: '#2D2A26', background: '#FFF8ED', border: 'none', borderRadius: 12, padding: '10px 18px', width: 180, textAlign: 'center' as const },
-  bigUnit: { fontSize: 16, color: '#8A8378', fontWeight: 600 },
+  bigUnit: { fontSize: 16, color: '#777167', fontWeight: 600 },
   macroGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 },
   macroCard: { borderRadius: 12, overflow: 'hidden', border: '1px solid #F0EDE8' },
   macroBar: { height: 6 },
@@ -214,8 +214,8 @@ const styles: any = {
   macroCardPct: { fontSize: 22, fontWeight: 700, color: '#2D2A26', margin: '8px 0' },
   macroInputRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
   macroInput: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '2px solid', background: '#FFF8ED', fontSize: 16, fontWeight: 600, color: '#2D2A26' },
-  macroUnit: { fontSize: 14, color: '#8A8378', fontWeight: 600, whiteSpace: 'nowrap' as const },
-  macroCals: { fontSize: 12, color: '#8A8378' },
-  saveBtn: { background: '#1FA873', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' },
-  savedTag: { fontSize: 14, fontWeight: 600, color: '#1FA873' },
+  macroUnit: { fontSize: 14, color: '#777167', fontWeight: 600, whiteSpace: 'nowrap' as const },
+  macroCals: { fontSize: 12, color: '#777167' },
+  saveBtn: { background: '#188159', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' },
+  savedTag: { fontSize: 14, fontWeight: 600, color: '#188159' },
 };

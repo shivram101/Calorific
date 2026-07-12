@@ -73,7 +73,7 @@ function ResetPasswordPage() {
             <div style={{ textAlign: 'center', marginBottom: '26px' }}>
               <div style={{ fontSize: '36px', marginBottom: '8px' }}>🔒</div>
               <h1 style={{ fontSize: '21px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Reset password</h1>
-              <p style={{ fontSize: '12px', color: '#8A8378', marginTop: '5px' }}>
+              <p style={{ fontSize: '12px', color: '#777167', marginTop: '5px' }}>
                 Enter your new password below
               </p>
             </div>
@@ -83,7 +83,7 @@ function ResetPasswordPage() {
                 style={{
                   background: '#FDF0EE',
                   border: '1px solid #DC4C3F',
-                  color: '#DC4C3F',
+                  color: '#c24337',
                   borderRadius: '12px',
                   padding: '12px 16px',
                   fontSize: '13px',
@@ -95,7 +95,7 @@ function ResetPasswordPage() {
             )}
 
             <form onSubmit={handleSubmit}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
+              <label htmlFor="reset-password" style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
                 New password
               </label>
               <div
@@ -111,6 +111,7 @@ function ResetPasswordPage() {
               >
                 <i className="ti ti-lock" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
                 <input
+                  id="reset-password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
@@ -127,7 +128,7 @@ function ResetPasswordPage() {
                 />
               </div>
 
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
+              <label htmlFor="reset-confirm-password" style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>
                 Confirm new password
               </label>
               <div
@@ -143,6 +144,7 @@ function ResetPasswordPage() {
               >
                 <i className="ti ti-lock" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
                 <input
+                  id="reset-confirm-password"
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
@@ -163,7 +165,7 @@ function ResetPasswordPage() {
                 type="submit"
                 style={{
                   width: '100%',
-                  background: '#1FA873',
+                  background: '#188159',
                   color: '#fff',
                   border: 'none',
                   borderRadius: '14px',
@@ -182,14 +184,14 @@ function ResetPasswordPage() {
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
             <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Password reset!</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '13px', color: '#777167', marginTop: '10px', lineHeight: 1.6 }}>
               Your password has been updated successfully.
             </p>
             <a
               href="/login"
               style={{
                 display: 'block',
-                background: '#1FA873',
+                background: '#188159',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '14px',

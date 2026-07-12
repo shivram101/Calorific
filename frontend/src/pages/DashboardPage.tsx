@@ -170,7 +170,7 @@ function DashboardPage() {
       </div>
 
       {error && (
-        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#DC4C3F', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
+        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
           {error}
         </div>
       )}
@@ -184,7 +184,7 @@ function DashboardPage() {
 
           {/* Search */}
           <form onSubmit={handleSearch} style={styles.searchRow}>
-            <input placeholder="Search foods..." value={search} onChange={e => setSearch(e.target.value)} style={styles.search} />
+            <input aria-label="Search foods" placeholder="Search foods..." value={search} onChange={e => setSearch(e.target.value)} style={styles.search} />
             <button type="submit" style={styles.searchBtn} disabled={searching}>
               {searching ? '...' : 'Search'}
             </button>
@@ -199,8 +199,8 @@ function DashboardPage() {
                   style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}
                 >
                   <strong>{food.name}</strong>
-                  {food.brand && <span style={{ color: '#8A8378', marginLeft: 6 }}>{food.brand}</span>}
-                  <span style={{ float: 'right', color: '#1FA873', fontWeight: 600 }}>{food.calories} kcal</span>
+                  {food.brand && <span style={{ color: '#777167', marginLeft: 6 }}>{food.brand}</span>}
+                  <span style={{ float: 'right', color: '#188159', fontWeight: 600 }}>{food.calories} kcal</span>
                 </div>
               ))}
             </div>
@@ -212,15 +212,15 @@ function DashboardPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
                 <strong style={{ fontSize: 13 }}>{selectedFood.name}</strong>
                 <button type="button" onClick={() => setSelectedFood(null)}
-                  style={{ background: 'none', border: 'none', color: '#DC4C3F', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  style={{ background: 'none', border: 'none', color: '#c24337', cursor: 'pointer', fontSize: 16 }}>✕</button>
               </div>
-              <div style={{ fontSize: 12, color: '#8A8378', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: '#777167', marginBottom: 10 }}>
                 Per serving: {selectedFood.calories} kcal · {selectedFood.protein}g P · {selectedFood.carbs}g C · {selectedFood.fat}g F
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input type="number" min="0.1" step="0.1" value={quantity} onChange={e => setQuantity(Number(e.target.value))}
-                  style={{ ...styles.input, maxWidth: 80 }} placeholder="Qty" />
-                <select value={meal} onChange={e => setMeal(e.target.value as Meal)} style={styles.select}>
+                  aria-label="Quantity" style={{ ...styles.input, maxWidth: 80 }} placeholder="Qty" />
+                <select value={meal} onChange={e => setMeal(e.target.value as Meal)} aria-label="Meal" style={styles.select}>
                   {MEALS.map(m => <option key={m} value={m}>{MEAL_LABELS[m]}</option>)}
                 </select>
                 <button type="submit" style={styles.addBtn}>Add</button>
@@ -232,12 +232,12 @@ function DashboardPage() {
           <div style={{ marginTop: 14, borderTop: '1px solid #eee', paddingTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
               <strong style={{ fontSize: 13 }}>💧 Water today</strong>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#378ADD' }}>{waterMl} ml</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#2e74ba' }}>{waterMl} ml</span>
             </div>
             <form onSubmit={handleAddWater} style={{ display: 'flex', gap: 8 }}>
-              <input type="number" placeholder="ml (e.g. 250)" value={waterInput} onChange={e => setWaterInput(e.target.value)}
+              <input type="number" aria-label="Water amount in milliliters" placeholder="ml (e.g. 250)" value={waterInput} onChange={e => setWaterInput(e.target.value)}
                 style={{ ...styles.input, flex: 1 }} />
-              <button type="submit" style={{ ...styles.addBtn, background: '#378ADD' }}>+ Water</button>
+              <button type="submit" style={{ ...styles.addBtn, background: '#2e74ba' }}>+ Water</button>
             </form>
           </div>
         </div>
@@ -252,9 +252,9 @@ function DashboardPage() {
           </div>
           <div style={styles.macroCard}>
             {[
-              { label: 'Fat', value: totals.fat, color: '#378ADD' },
-              { label: 'Protein', value: totals.protein, color: '#DC4C3F' },
-              { label: 'Carbs', value: totals.carbs, color: '#EF9F27' },
+              { label: 'Fat', value: totals.fat, color: '#2e74ba' },
+              { label: 'Protein', value: totals.protein, color: '#c24337' },
+              { label: 'Carbs', value: totals.carbs, color: '#9b6719' },
             ].map(({ label, value, color }) => (
               <div key={label} style={styles.macroItem}>
                 <div style={{ ...styles.macroValue, color }}>{value}g</div>
@@ -269,11 +269,11 @@ function DashboardPage() {
       <div style={styles.card}>
         <div style={styles.header}>
           <h2 style={{ margin: 0, fontSize: 18 }}>Food diary</h2>
-          <p style={{ margin: 0, color: '#8A8378' }}>Total calories: {totals.calories}</p>
+          <p style={{ margin: 0, color: '#777167' }}>Total calories: {totals.calories}</p>
         </div>
 
         {diaryLoading ? (
-          <p style={{ color: '#8A8378', fontSize: 13 }}>Loading diary...</p>
+          <p style={{ color: '#777167', fontSize: 13 }}>Loading diary...</p>
         ) : (
           MEALS.map(m => {
             const items = grouped[m];
@@ -282,7 +282,7 @@ function DashboardPage() {
               <div key={m} style={styles.section}>
                 <div style={styles.sectionHeader}>
                   <strong>{MEAL_LABELS[m]}</strong>
-                  <span style={{ color: '#8A8378' }}>{mealCalories} kcal</span>
+                  <span style={{ color: '#777167' }}>{mealCalories} kcal</span>
                 </div>
                 {items.length === 0 ? (
                   <div style={styles.empty}>No entries</div>
@@ -295,9 +295,9 @@ function DashboardPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                         <span style={styles.metaBold}>{item.calories} kcal</span>
-                        <span style={{ ...styles.macroTag, color: '#DC4C3F' }}>{item.protein}g P</span>
-                        <span style={{ ...styles.macroTag, color: '#EF9F27' }}>{item.carbs}g C</span>
-                        <span style={{ ...styles.macroTag, color: '#378ADD' }}>{item.fat}g F</span>
+                        <span style={{ ...styles.macroTag, color: '#c24337' }}>{item.protein}g P</span>
+                        <span style={{ ...styles.macroTag, color: '#9b6719' }}>{item.carbs}g C</span>
+                        <span style={{ ...styles.macroTag, color: '#2e74ba' }}>{item.fat}g F</span>
                         <button onClick={() => handleDeleteLog(item._id)} style={styles.delete}>✕</button>
                       </div>
                     </div>
@@ -338,7 +338,7 @@ function ProgressRing({ value, max, color, label, unit }: { value: number; max: 
           r={radius} cx={size / 2} cy={size / 2}
           style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.4s' }} />
         <text x="50%" y="46%" textAnchor="middle" style={{ fontSize: 18, fontWeight: 700, fill: '#2D2A26' }}>{value}</text>
-        <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 10, fill: '#8A8378' }}>/ {max}{unit}</text>
+        <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 10, fill: '#777167' }}>/ {max}{unit}</text>
       </svg>
       <div style={styles.ringLabel}>{label}</div>
     </div>
@@ -352,38 +352,38 @@ const styles: any = {
   ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand: { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
   ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
-  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#C7C2B8', cursor: 'pointer' },
+  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
-  logoutBtn: { background: '#DC4C3F', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
+  logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
   topGrid: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 15, alignItems: 'start' },
   card: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
   summaryCol: { display: 'flex', flexDirection: 'column', gap: 15 },
   summaryCard: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
-  summaryEyebrow: { fontSize: 11, fontWeight: 700, color: '#1FA873', letterSpacing: 0.5 },
+  summaryEyebrow: { fontSize: 11, fontWeight: 700, color: '#188159', letterSpacing: 0.5 },
   summaryDate: { fontSize: 13, fontWeight: 600, color: '#2D2A26', marginBottom: 12 },
-  summaryCalLabel: { fontSize: 11, color: '#8A8378', textAlign: 'right' },
+  summaryCalLabel: { fontSize: 11, color: '#777167', textAlign: 'right' },
   summaryCalValue: { fontSize: 28, fontWeight: 700, color: '#2D2A26', textAlign: 'right' },
   macroCard: { background: '#fff', borderRadius: 16, padding: '16px 20px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between' },
   macroItem: { textAlign: 'center' },
   macroValue: { fontSize: 18, fontWeight: 700 },
-  macroLabel: { fontSize: 11, color: '#8A8378', marginTop: 2 },
+  macroLabel: { fontSize: 11, color: '#777167', marginTop: 2 },
   header: { display: 'flex', justifyContent: 'space-between', marginBottom: 15 },
   searchRow: { display: 'flex', gap: 10, marginBottom: 10 },
   search: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: '1px solid transparent', outline: 'none' },
-  searchBtn: { padding: '10px 14px', background: '#1FA873', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer' },
+  searchBtn: { padding: '10px 14px', background: '#188159', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer' },
   input: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none', outline: 'none' },
   select: { padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none' },
-  addBtn: { background: '#1FA873', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+  addBtn: { background: '#188159', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
   section: { marginBottom: 15 },
   sectionHeader: { display: 'flex', justifyContent: 'space-between', background: '#F3F6FF', padding: 10, borderRadius: 8, marginBottom: 8 },
   row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderBottom: '1px solid #eee' },
   foodName: { fontWeight: 600 },
-  meta: { fontSize: 12, color: '#8A8378' },
+  meta: { fontSize: 12, color: '#777167' },
   metaBold: { fontSize: 13, fontWeight: 700, color: '#2D2A26', minWidth: 70, textAlign: 'right' },
   macroTag: { fontSize: 12, fontWeight: 600 },
-  delete: { border: 'none', background: 'transparent', color: '#DC4C3F', fontSize: 16, cursor: 'pointer' },
-  empty: { fontSize: 12, color: '#aaa', padding: 10 },
+  delete: { border: 'none', background: 'transparent', color: '#c24337', fontSize: 16, cursor: 'pointer' },
+  empty: { fontSize: 12, color: '#767676', padding: 10 },
   ringsRow: { display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 20 },
   ringWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
   ringLabel: { fontSize: 12, fontWeight: 600, color: '#2D2A26' },
