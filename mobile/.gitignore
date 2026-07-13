@@ -46,6 +46,15 @@ example
 
 .env
 
-# generated native folders
+# generated native folders (React Native era — note: Flutter's android/ is tracked)
 /ios
-/android
+
+# Flutter
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+.idea/
+*.iml
