@@ -16,12 +16,25 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   int _step = 1;
   String _sex = '';
+  bool _isMetric = true;
+
+  // Metric inputs (canonical units the API expects)
   final _ageController = TextEditingController();
-  final _heightController = TextEditingController();
-  final _weightController = TextEditingController();
+  final _heightController = TextEditingController(); // cm
+  final _weightController = TextEditingController(); // kg
+
+  // Imperial inputs - kept separate so switching units doesn't clobber
+  // whatever the person already typed.
+  final _feetController = TextEditingController();
+  final _inchesController = TextEditingController();
+  final _lbsController = TextEditingController();
+
   String _activityLevel = '';
   String _goal = '';
   bool _submitting = false;
+
+  static const double _cmPerInch = 2.54;
+  static const double _kgPerLb = 0.45359237;
 
   static const activities = [
     ('Sedentary', '🛋️'),
@@ -36,6 +49,59 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     ('gain', 'Gain', '📈'),
   ];
 
+  // Canonical height in cm, computed from whichever unit is active — the
+  // API and any algorithms only ever see this, never raw feet/inches.
+  double? get _heightCm {
+    if (_isMetric) return double.tryParse(_heightController.text);
+    final feet = double.tryParse(_feetController.text) ?? 0;
+    final inches = double.tryParse(_inchesController.text) ?? 0;
+    if (feet == 0 && inches == 0) return null;
+    return (feet * 12 + inches) * _cmPerInch;
+  }
+
+  // Canonical weight in kg, computed from whichever unit is active.
+  double? get _weightKg {
+    if (_isMetric) return double.tryParse(_weightController.text);
+    final lbs = double.tryParse(_lbsController.text);
+    if (lbs == null) return null;
+    return lbs * _kgPerLb;
+  }
+
+  // Switches the displayed unit system, converting whatever the person has
+  // already entered so nothing is lost (e.g. cm typed in, then they flip to
+  // imperial - the feet/inches fields are pre-filled with the equivalent).
+  void _setUnitSystem(bool metric) {
+    if (metric == _isMetric) return;
+    setState(() {
+      if (metric) {
+        final feet = double.tryParse(_feetController.text) ?? 0;
+        final inches = double.tryParse(_inchesController.text) ?? 0;
+        if (feet > 0 || inches > 0) {
+          final cm = (feet * 12 + inches) * _cmPerInch;
+          _heightController.text = cm.round().toString();
+        }
+        final lbs = double.tryParse(_lbsController.text);
+        if (lbs != null) {
+          _weightController.text = (lbs * _kgPerLb).toStringAsFixed(1);
+        }
+      } else {
+        final cm = double.tryParse(_heightController.text);
+        if (cm != null) {
+          var totalInches = (cm / _cmPerInch).round();
+          var feet = totalInches ~/ 12;
+          var inches = totalInches % 12;
+          _feetController.text = feet.toString();
+          _inchesController.text = inches.toString();
+        }
+        final kg = double.tryParse(_weightController.text);
+        if (kg != null) {
+          _lbsController.text = (kg / _kgPerLb).toStringAsFixed(1);
+        }
+      }
+      _isMetric = metric;
+    });
+  }
+
   Future<void> _handleFinish() async {
     if (_activityLevel.isEmpty || _goal.isEmpty) {
       _showError('Please select an activity level and goal');
@@ -47,8 +113,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       await updateProfile({
         'sex': _sex,
         'age': int.tryParse(_ageController.text),
-        'heightCm': double.tryParse(_heightController.text),
-        'weightKg': double.tryParse(_weightController.text),
+        'heightCm': _heightCm,
+        'weightKg': _weightKg,
         'activityLevel': _activityLevel,
         'goal': _goal,
       });
@@ -115,9 +181,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _label('Sex'),
       Row(
         children: [
-          Expanded(child: _tile('Male', '♂️', _sex == 'Male', () => setState(() => _sex = 'Male'))),
+          Expanded(
+              child: _tile('Male', '♂️', _sex == 'Male',
+                  () => setState(() => _sex = 'Male'))),
           const SizedBox(width: 12),
-          Expanded(child: _tile('Female', '♀️', _sex == 'Female', () => setState(() => _sex = 'Female'))),
+          Expanded(
+              child: _tile('Female', '♀️', _sex == 'Female',
+                  () => setState(() => _sex = 'Female'))),
         ],
       ),
       const SizedBox(height: 20),
@@ -127,20 +197,52 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         keyboardType: TextInputType.number,
         decoration: const InputDecoration(hintText: '21'),
       ),
+      const SizedBox(height: 20),
+      _unitToggle(),
+      const SizedBox(height: 20),
+      _label(_isMetric ? 'Height (cm)' : 'Height'),
+      if (_isMetric)
+        TextField(
+          controller: _heightController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: '175'),
+        )
+      else
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _feetController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(hintText: '5', suffixText: 'ft'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: TextField(
+                controller: _inchesController,
+                keyboardType: TextInputType.number,
+                decoration:
+                    const InputDecoration(hintText: '9', suffixText: 'in'),
+              ),
+            ),
+          ],
+        ),
       const SizedBox(height: 16),
-      _label('Height (cm)'),
-      TextField(
-        controller: _heightController,
-        keyboardType: TextInputType.number,
-        decoration: const InputDecoration(hintText: '175'),
-      ),
-      const SizedBox(height: 16),
-      _label('Weight (kg)'),
-      TextField(
-        controller: _weightController,
-        keyboardType: TextInputType.number,
-        decoration: const InputDecoration(hintText: '70'),
-      ),
+      _label(_isMetric ? 'Weight (kg)' : 'Weight (lbs)'),
+      if (_isMetric)
+        TextField(
+          controller: _weightController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: '70'),
+        )
+      else
+        TextField(
+          controller: _lbsController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: const InputDecoration(hintText: '154'),
+        ),
       const SizedBox(height: 32),
       SizedBox(
         width: double.infinity,
@@ -150,6 +252,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         ),
       ),
     ];
+  }
+
+  // Metric / Imperial segmented toggle — governs both height and weight
+  // fields below it so the person only has to pick a system once.
+  Widget _unitToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: CalorificColors.cream,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _unitOption('Metric', true)),
+          Expanded(child: _unitOption('Imperial', false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _unitOption(String label, bool metric) {
+    final selected = _isMetric == metric;
+    return GestureDetector(
+      onTap: () => _setUnitSystem(metric),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? CalorificColors.green : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : CalorificColors.textMuted,
+          ),
+        ),
+      ),
+    );
   }
 
   List<Widget> _buildStep2() {
@@ -302,6 +445,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _feetController.dispose();
+    _inchesController.dispose();
+    _lbsController.dispose();
     super.dispose();
   }
 }

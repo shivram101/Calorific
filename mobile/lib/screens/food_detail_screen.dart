@@ -2,7 +2,10 @@
 // Nutrition breakdown for a single food + quantity stepper + meal selector.
 // Calls GET /api/foods/:id, logs via POST /api/logs.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api/client.dart';
 import '../main.dart';
 
@@ -23,6 +26,12 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   double _quantity = 1;
   late String _meal;
 
+  // Quantity stepper state
+  late final TextEditingController _qtyController;
+  final FocusNode _qtyFocusNode = FocusNode();
+  Timer? _holdTimer;
+  static const List<double> _qtyPresets = [0.5, 1, 1.5, 2, 2.5, 3];
+
   static const meals = [
     ('breakfast', 'Breakfast', '☀️'),
     ('lunch', 'Lunch', '🌤️'),
@@ -34,13 +43,84 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   void initState() {
     super.initState();
     _meal = widget.initialMeal ?? 'breakfast';
+    _qtyController = TextEditingController(text: _formatQty(_quantity));
+    _qtyFocusNode.addListener(() {
+      if (!_qtyFocusNode.hasFocus) _commitQtyText();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    _qtyFocusNode.dispose();
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  // Formats a serving quantity without trailing zeros, e.g. 1.5 -> "1.5", 2.0 -> "2".
+  String _formatQty(double q) {
+    if (q == q.roundToDouble()) return q.round().toString();
+    var s = q.toStringAsFixed(2);
+    s = s.replaceFirst(RegExp(r'0$'), '');
+    s = s.replaceFirst(RegExp(r'\.$'), '');
+    return s;
+  }
+
+  void _setQuantity(double newQty, {bool syncController = true}) {
+    final clamped = double.parse(newQty.clamp(0.25, 99).toStringAsFixed(2));
+    setState(() => _quantity = clamped);
+    if (syncController) {
+      _qtyController.text = _formatQty(clamped);
+    }
+  }
+
+  // Parses whatever the user typed when the field loses focus, reverting to
+  // the last valid value if it can't be parsed.
+  void _commitQtyText() {
+    final parsed =
+        double.tryParse(_qtyController.text.trim().replaceAll(',', '.'));
+    if (parsed == null || parsed <= 0) {
+      _qtyController.text = _formatQty(_quantity);
+      return;
+    }
+    _setQuantity(parsed);
+  }
+
+  void _bumpQuantity(double step) {
+    HapticFeedback.selectionClick();
+    _setQuantity(_quantity + step);
+  }
+
+  // Long-press-to-repeat: single bump immediately, then repeats, speeding up
+  // after the first few ticks so small and large adjustments both feel natural.
+  void _startHold(double step) {
+    _bumpQuantity(step);
+    var tick = 0;
+    _holdTimer = Timer.periodic(const Duration(milliseconds: 350), (timer) {
+      tick++;
+      _bumpQuantity(step);
+      if (tick == 3) {
+        timer.cancel();
+        _holdTimer = Timer.periodic(
+            const Duration(milliseconds: 110), (_) => _bumpQuantity(step));
+      }
+    });
+  }
+
+  void _stopHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
   }
 
   Future<void> _load() async {
     try {
       final food = await getFoodDetail(widget.foodId);
-      if (mounted) setState(() { _food = food; _loading = false; });
+      if (mounted)
+        setState(() {
+          _food = food;
+          _loading = false;
+        });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -73,7 +153,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     if (_loading) {
       return const Scaffold(
         backgroundColor: CalorificColors.cream,
-        body: Center(child: CircularProgressIndicator(color: CalorificColors.green)),
+        body: Center(
+            child: CircularProgressIndicator(color: CalorificColors.green)),
       );
     }
 
@@ -115,8 +196,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             Text(food.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.bold)),
+                style:
+                    const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -135,7 +216,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('$_quantity × ${food.servingSize.round()}${food.servingSizeUnit}',
+                    Text(
+                        '${_formatQty(_quantity)} × ${food.servingSize.round()}${food.servingSizeUnit}',
                         style: const TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w600)),
                     Text('$cal kcal',
@@ -165,31 +247,78 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Serving size',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _stepBtn(Icons.remove, CalorificColors.cream,
-                        CalorificColors.textDark, () {
-                      setState(() =>
-                          _quantity = (_quantity - 0.5).clamp(0.5, 99));
-                    }),
+                    _spinBtn(Icons.remove, CalorificColors.cream,
+                        CalorificColors.textDark, -0.25),
                     Expanded(
-                      child: Text(
-                        '$_quantity servings',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                      child: GestureDetector(
+                        onTap: () {
+                          _qtyFocusNode.requestFocus();
+                          _qtyController.selection = TextSelection(
+                              baseOffset: 0,
+                              extentOffset: _qtyController.text.length);
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: CalorificColors.cream,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              IntrinsicWidth(
+                                child: TextField(
+                                  controller: _qtyController,
+                                  focusNode: _qtyFocusNode,
+                                  textAlign: TextAlign.center,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                          decimal: true),
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: CalorificColors.textDark),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onSubmitted: (_) => _qtyFocusNode.unfocus(),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _quantity == 1 ? 'serving' : 'servings',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    color: CalorificColors.textMuted),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    _stepBtn(Icons.add, CalorificColors.green, Colors.white,
-                        () {
-                      setState(() =>
-                          _quantity = (_quantity + 0.5).clamp(0.5, 99));
-                    }),
+                    _spinBtn(
+                        Icons.add, CalorificColors.green, Colors.white, 0.25),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                // Quick presets for the most common serving multiples
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: _qtyPresets.map((p) => _presetChip(p)).toList(),
+                ),
+                const SizedBox(height: 10),
                 Center(
                   child: Text(
                     '1 serving = ${food.servingSize.round()} ${food.servingSizeUnit}',
@@ -208,7 +337,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Add to meal',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Row(
                   children: meals
@@ -219,8 +349,8 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                               child: GestureDetector(
                                 onTap: () => setState(() => _meal = m.$1),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   decoration: BoxDecoration(
                                     color: _meal == m.$1
                                         ? CalorificColors.green
@@ -230,8 +360,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                                   child: Column(
                                     children: [
                                       Text(m.$3,
-                                          style:
-                                              const TextStyle(fontSize: 16)),
+                                          style: const TextStyle(fontSize: 16)),
                                       const SizedBox(height: 2),
                                       Text(m.$2,
                                           style: TextStyle(
@@ -239,8 +368,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                                               fontWeight: FontWeight.bold,
                                               color: _meal == m.$1
                                                   ? Colors.white
-                                                  : CalorificColors
-                                                      .textMuted)),
+                                                  : CalorificColors.textMuted)),
                                     ],
                                   ),
                                 ),
@@ -260,8 +388,10 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Nutrition facts',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                Text('Per $_quantity serving${_quantity != 1 ? "s" : ""}',
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                Text(
+                    'Per ${_formatQty(_quantity)} serving${_quantity != 1 ? "s" : ""}',
                     style: const TextStyle(
                         fontSize: 12, color: CalorificColors.textMuted)),
                 const SizedBox(height: 8),
@@ -368,18 +498,49 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
         ],
       );
 
-  Widget _stepBtn(
-          IconData icon, Color bg, Color fg, VoidCallback onTap) =>
+  // Spin-box style +/- button: single tap nudges by [step], holding it down
+  // repeats and accelerates (see _startHold).
+  Widget _spinBtn(IconData icon, Color bg, Color fg, double step) =>
       GestureDetector(
-        onTap: onTap,
+        onTap: () => _bumpQuantity(step),
+        onLongPressStart: (_) => _startHold(step),
+        onLongPressEnd: (_) => _stopHold(),
+        onLongPressUp: _stopHold,
+        onLongPressCancel: _stopHold,
         child: Container(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(
-              color: bg, borderRadius: BorderRadius.circular(12)),
+          decoration:
+              BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: fg, size: 20),
         ),
       );
+
+  // Tappable chip for a common serving multiple (0.5x, 1x, 1.5x, etc).
+  Widget _presetChip(double value) {
+    final selected = (_quantity - value).abs() < 0.001;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        _setQuantity(value);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? CalorificColors.green : CalorificColors.cream,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          '${_formatQty(value)}×',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: selected ? Colors.white : CalorificColors.textDark,
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _factRow(String label, String value,
       {bool bold = false, Color? color}) {

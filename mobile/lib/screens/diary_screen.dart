@@ -17,6 +17,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
   DailyLog? _log;
   double _waterMl = 0;
   bool _loading = true;
+  Targets? _targets;
 
   static const meals = ['breakfast', 'lunch', 'dinner', 'snack'];
   static const mealLabels = {
@@ -38,6 +39,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
       final results = await Future.wait([
         getLogs(today),
         getWater(today),
+        getTargets(),
       ]);
       if (!mounted) return;
       setState(() {
@@ -45,6 +47,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
         _waterMl = ((results[1] as Map<String, dynamic>)['totalMl'] as num?)
                 ?.toDouble() ??
             0;
+        _targets = results[2] as Targets?;
         _loading = false;
       });
     } catch (e) {
@@ -58,32 +61,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
     }
   }
 
-  int _pendingWater = 0;
-
   Future<void> _handleAddWater(double amount) async {
-    // Optimistic update: bump the counter instantly. Rapid taps each bump;
-    // the server total is only reconciled once ALL in-flight requests finish,
-    // so the number never flickers backwards mid-burst.
-    setState(() => _waterMl += amount);
-    _pendingWater++;
     try {
-      await addWater(amount, todayString());
+      final result = await addWater(amount, todayString());
+      setState(
+          () => _waterMl = (result['totalMl'] as num?)?.toDouble() ?? _waterMl);
     } catch (e) {
-      if (mounted) {
-        setState(() => _waterMl -= amount);
-        _showError(e.toString());
-      }
-    } finally {
-      _pendingWater--;
-      if (_pendingWater == 0) {
-        try {
-          final water = await getWater(todayString());
-          if (mounted && _pendingWater == 0) {
-            setState(() => _waterMl =
-                ((water['totalMl'] as num?) ?? _waterMl).toDouble());
-          }
-        } catch (_) {}
-      }
+      _showError(e.toString());
     }
   }
 
@@ -132,7 +116,10 @@ class _DiaryScreenState extends State<DiaryScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => _FoodSearchSheet(
-        onFoodLogged: _loadDiary,
+        onFoodLogged: () {
+          Navigator.pop(context);
+          _loadDiary();
+        },
       ),
     );
   }
@@ -218,12 +205,26 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: CalorificColors.textDark)),
-                            Text(
-                              '${totals?.calories.round() ?? 0}',
-                              style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: CalorificColors.green),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  '${totals?.calories.round() ?? 0}',
+                                  style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      color: CalorificColors.green),
+                                ),
+                                if (_targets != null &&
+                                    _targets!.calorieTarget > 0)
+                                  Text(
+                                    ' / ${_targets!.calorieTarget.round()} kcal',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        color: CalorificColors.textMuted),
+                                  ),
+                              ],
                             ),
                           ],
                         ),
@@ -231,14 +232,33 @@ class _DiaryScreenState extends State<DiaryScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _macroStat('Protein', totals?.protein ?? 0,
+                            _macroRing(
+                                'Protein',
+                                totals?.protein ?? 0,
+                                _targets?.proteinTarget,
                                 CalorificColors.protein),
-                            _macroStat('Carbs', totals?.carbs ?? 0,
-                                CalorificColors.carbs),
-                            _macroStat(
-                                'Fat', totals?.fat ?? 0, CalorificColors.fat),
+                            _macroRing('Carbs', totals?.carbs ?? 0,
+                                _targets?.carbTarget, CalorificColors.carbs),
+                            _macroRing('Fat', totals?.fat ?? 0,
+                                _targets?.fatTarget, CalorificColors.fat),
                           ],
                         ),
+                        if (_targets == null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: GestureDetector(
+                              onTap: () =>
+                                  Navigator.pushNamed(context, '/goals')
+                                      .then((_) => _loadDiary()),
+                              child: const Text(
+                                'Set your goals to track progress →',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: CalorificColors.green),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -280,27 +300,25 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 4),
-                                        child: Material(
-                                          color: const Color(0xFFEEF4FF),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          child: InkWell(
-                                            borderRadius:
-                                                BorderRadius.circular(12),
-                                            onTap: () => _handleAddWater(
-                                                amt.toDouble()),
-                                            child: Padding(
-                                              padding: const EdgeInsets
-                                                  .symmetric(vertical: 8),
-                                              child: Center(
-                                                child: Text('+${amt}ml',
-                                                    style: const TextStyle(
-                                                        fontSize: 11,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: CalorificColors
-                                                            .fat)),
-                                              ),
+                                        child: GestureDetector(
+                                          onTap: () =>
+                                              _handleAddWater(amt.toDouble()),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEEF4FF),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Center(
+                                              child: Text('+${amt}ml',
+                                                  style: const TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color:
+                                                          CalorificColors.fat)),
                                             ),
                                           ),
                                         ),
@@ -315,12 +333,11 @@ class _DiaryScreenState extends State<DiaryScreen> {
 
                     // Meal sections
                     ...meals.map((meal) {
-                      final items = _log?.entries
-                              .where((e) => e.meal == meal)
-                              .toList() ??
-                          [];
-                      final mealCals = items.fold<double>(
-                          0, (sum, e) => sum + e.calories);
+                      final items =
+                          _log?.entries.where((e) => e.meal == meal).toList() ??
+                              [];
+                      final mealCals =
+                          items.fold<double>(0, (sum, e) => sum + e.calories);
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
@@ -348,8 +365,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                     Text('${mealCals.round()} kcal',
                                         style: const TextStyle(
                                             fontSize: 12,
-                                            color:
-                                                CalorificColors.textMuted)),
+                                            color: CalorificColors.textMuted)),
                                   ],
                                 ),
                               ),
@@ -361,8 +377,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                     child: Text('No entries yet',
                                         style: TextStyle(
                                             fontSize: 12,
-                                            color:
-                                                CalorificColors.textFaint)),
+                                            color: CalorificColors.textFaint)),
                                   ),
                                 )
                               else
@@ -415,8 +430,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                             child: const Icon(
                                                 Icons.close_rounded,
                                                 size: 18,
-                                                color:
-                                                    CalorificColors.danger),
+                                                color: CalorificColors.danger),
                                           ),
                                         ],
                                       ),
@@ -458,16 +472,56 @@ class _DiaryScreenState extends State<DiaryScreen> {
     );
   }
 
-  Widget _macroStat(String label, double value, Color color) {
+  // Compact ring showing progress toward a macro goal. Falls back to a
+  // plain gram count (no ring fill) when the person hasn't set a target yet.
+  Widget _macroRing(String label, double value, double? target, Color color) {
+    final hasTarget = target != null && target > 0;
+    final pct = hasTarget ? value / target : 0.0;
+    final clamped = pct < 0 ? 0.0 : (pct > 1 ? 1.0 : pct);
+    final isOver = pct > 1.0;
+    final ringColor = isOver ? CalorificColors.danger : color;
+
     return Column(
       children: [
-        Text('${value.round()}g',
-            style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: color)),
-        const SizedBox(height: 2),
+        SizedBox(
+          width: 60,
+          height: 60,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: CircularProgressIndicator(
+                  value: hasTarget ? clamped : 0,
+                  strokeWidth: 6,
+                  backgroundColor: color.withOpacity(0.15),
+                  valueColor: AlwaysStoppedAnimation<Color>(ringColor),
+                ),
+              ),
+              Text(
+                hasTarget ? '${(pct * 100).round()}%' : '${value.round()}g',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: CalorificColors.textDark),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
         Text(label,
             style: const TextStyle(
-                fontSize: 10, color: CalorificColors.textMuted)),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: CalorificColors.textDark)),
+        Text(
+          hasTarget
+              ? '${value.round()}/${target.round()}g'
+              : '${value.round()}g',
+          style:
+              const TextStyle(fontSize: 10, color: CalorificColors.textMuted),
+        ),
       ],
     );
   }
@@ -492,13 +546,28 @@ class _DiaryScreenState extends State<DiaryScreen> {
   }
 
   String _weekday(int day) => const [
-        'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-        'Friday', 'Saturday', 'Sunday'
+        'Monday',
+        'Tuesday',
+        'Wednesday',
+        'Thursday',
+        'Friday',
+        'Saturday',
+        'Sunday'
       ][day - 1];
 
   String _month(int month) => const [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ][month - 1];
 }
 
@@ -553,8 +622,7 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
                 children: [
@@ -655,9 +723,7 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                   final food = _results[index];
                   return GestureDetector(
                     onTap: () {
-                      // Keep the search sheet open underneath — backing out of
-                      // a food's detail returns to the results instead of
-                      // losing the search.
+                      Navigator.pop(context);
                       Navigator.pushNamed(
                         context,
                         '/food-detail',
@@ -695,8 +761,7 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                                   Text(food.brand!,
                                       style: const TextStyle(
                                           fontSize: 11,
-                                          color:
-                                              CalorificColors.textMuted)),
+                                          color: CalorificColors.textMuted)),
                               ],
                             ),
                           ),
