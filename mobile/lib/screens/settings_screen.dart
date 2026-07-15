@@ -18,14 +18,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _saving = false;
   bool _saved = false;
   UserProfile? _profile;
+  bool _isMetric = true;
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _ageController = TextEditingController();
-  final _heightController = TextEditingController();
-  final _weightController = TextEditingController();
+  final _heightController = TextEditingController(); // cm
+  final _weightController = TextEditingController(); // kg
+
+  // Imperial inputs — kept separate so switching units doesn't clobber
+  // whatever the person already typed.
+  final _feetController = TextEditingController();
+  final _inchesController = TextEditingController();
+  final _lbsController = TextEditingController();
+
   String _activityLevel = '';
   String _goal = '';
+
+  static const double _cmPerInch = 2.54;
+  static const double _kgPerLb = 0.45359237;
 
   static const activities = [
     'Sedentary',
@@ -43,6 +54,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  // Canonical height in cm, computed from whichever unit is active — the
+  // API only ever sees this, never raw feet/inches.
+  double? get _heightCm {
+    if (_isMetric) {
+      return _heightController.text.isEmpty
+          ? null
+          : double.tryParse(_heightController.text);
+    }
+    final feet = double.tryParse(_feetController.text) ?? 0;
+    final inches = double.tryParse(_inchesController.text) ?? 0;
+    if (feet == 0 && inches == 0) return null;
+    return (feet * 12 + inches) * _cmPerInch;
+  }
+
+  // Canonical weight in kg, computed from whichever unit is active.
+  double? get _weightKg {
+    if (_isMetric) {
+      return _weightController.text.isEmpty
+          ? null
+          : double.tryParse(_weightController.text);
+    }
+    final lbs = double.tryParse(_lbsController.text);
+    if (lbs == null) return null;
+    return lbs * _kgPerLb;
+  }
+
+  // Switches the displayed unit system, converting whatever the person has
+  // already entered so nothing is lost.
+  void _setUnitSystem(bool metric) {
+    if (metric == _isMetric) return;
+    setState(() {
+      if (metric) {
+        final feet = double.tryParse(_feetController.text) ?? 0;
+        final inches = double.tryParse(_inchesController.text) ?? 0;
+        if (feet > 0 || inches > 0) {
+          final cm = (feet * 12 + inches) * _cmPerInch;
+          _heightController.text = cm.round().toString();
+        }
+        final lbs = double.tryParse(_lbsController.text);
+        if (lbs != null) {
+          _weightController.text = (lbs * _kgPerLb).toStringAsFixed(1);
+        }
+      } else {
+        final cm = double.tryParse(_heightController.text);
+        if (cm != null) {
+          final totalInches = (cm / _cmPerInch).round();
+          final feet = totalInches ~/ 12;
+          final inches = totalInches % 12;
+          _feetController.text = feet.toString();
+          _inchesController.text = inches.toString();
+        }
+        final kg = double.tryParse(_weightController.text);
+        if (kg != null) {
+          _lbsController.text = (kg / _kgPerLb).toStringAsFixed(1);
+        }
+      }
+      _isMetric = metric;
+    });
   }
 
   Future<void> _load() async {
@@ -76,10 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'lastName': _lastNameController.text,
         if (_ageController.text.isNotEmpty)
           'age': int.tryParse(_ageController.text),
-        if (_heightController.text.isNotEmpty)
-          'heightCm': double.tryParse(_heightController.text),
-        if (_weightController.text.isNotEmpty)
-          'weightKg': double.tryParse(_weightController.text),
+        if (_heightCm != null) 'heightCm': _heightCm,
+        if (_weightKg != null) 'weightKg': _weightKg,
         if (_activityLevel.isNotEmpty) 'activityLevel': _activityLevel,
         if (_goal.isNotEmpty) 'goal': _goal,
       });
@@ -259,21 +328,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                        child: _field('Age', _ageController,
-                            TextInputType.number)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: _field('Height (cm)', _heightController,
-                            TextInputType.number)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: _field('Weight (kg)', _weightController,
-                            TextInputType.number)),
-                  ],
-                ),
+                _field('Age', _ageController, TextInputType.number),
+                const SizedBox(height: 16),
+                _unitToggle(),
+                const SizedBox(height: 16),
+                _label(_isMetric ? 'Height (cm)' : 'Height'),
+                if (_isMetric)
+                  TextField(
+                    controller: _heightController,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() => _saved = false),
+                    decoration: const InputDecoration(hintText: '175'),
+                  )
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _feetController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() => _saved = false),
+                          decoration: const InputDecoration(
+                              hintText: '5', suffixText: 'ft'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: _inchesController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() => _saved = false),
+                          decoration: const InputDecoration(
+                              hintText: '9', suffixText: 'in'),
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                _label(_isMetric ? 'Weight (kg)' : 'Weight (lbs)'),
+                if (_isMetric)
+                  TextField(
+                    controller: _weightController,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() => _saved = false),
+                    decoration: const InputDecoration(hintText: '70'),
+                  )
+                else
+                  TextField(
+                    controller: _lbsController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => setState(() => _saved = false),
+                    decoration: const InputDecoration(hintText: '154'),
+                  ),
               ],
             ),
           ),
@@ -293,8 +400,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   runSpacing: 8,
                   children: activities
                       .map((a) => GestureDetector(
-                            onTap: () =>
-                                setState(() { _activityLevel = a; _saved = false; }),
+                            onTap: () => setState(() {
+                              _activityLevel = a;
+                              _saved = false;
+                            }),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
@@ -336,11 +445,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 4),
                               child: GestureDetector(
-                                onTap: () =>
-                                    setState(() { _goal = g.$1; _saved = false; }),
+                                onTap: () => setState(() {
+                                  _goal = g.$1;
+                                  _saved = false;
+                                }),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 12),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                   decoration: BoxDecoration(
                                     color: _goal == g.$1
                                         ? CalorificColors.green
@@ -350,8 +461,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   child: Column(
                                     children: [
                                       Text(g.$3,
-                                          style:
-                                              const TextStyle(fontSize: 18)),
+                                          style: const TextStyle(fontSize: 18)),
                                       const SizedBox(height: 2),
                                       Text(g.$2,
                                           style: TextStyle(
@@ -359,8 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                               fontWeight: FontWeight.bold,
                                               color: _goal == g.$1
                                                   ? Colors.white
-                                                  : CalorificColors
-                                                      .textMuted)),
+                                                  : CalorificColors.textMuted)),
                                     ],
                                   ),
                                 ),
@@ -413,8 +522,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 4),
                 const Text(
                   'Permanently delete your account and all your data. This cannot be undone.',
-                  style: TextStyle(
-                      fontSize: 12, color: CalorificColors.textMuted),
+                  style:
+                      TextStyle(fontSize: 12, color: CalorificColors.textMuted),
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
@@ -440,8 +549,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _field(String label, TextEditingController controller,
-      TextInputType? type) {
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: CalorificColors.textDark)),
+      );
+
+  // Metric / Imperial segmented toggle — governs both height and weight
+  // fields below it so the person only has to pick a system once.
+  Widget _unitToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: CalorificColors.cream,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _unitOption('Metric', true)),
+          Expanded(child: _unitOption('Imperial', false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _unitOption(String label, bool metric) {
+    final selected = _isMetric == metric;
+    return GestureDetector(
+      onTap: () => _setUnitSystem(metric),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? CalorificColors.green : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : CalorificColors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _field(
+      String label, TextEditingController controller, TextInputType? type) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -480,6 +639,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
+    _feetController.dispose();
+    _inchesController.dispose();
+    _lbsController.dispose();
     super.dispose();
   }
 }

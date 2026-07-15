@@ -19,7 +19,13 @@ class _TrendsScreenState extends State<TrendsScreen> {
   List<WeightEntry> _weights = [];
   List<DailySummary> _summary = [];
   int _range = 30;
+  bool _isMetric = true;
   final _weightController = TextEditingController();
+
+  static const double _kgPerLb = 0.45359237;
+
+  // Converts a canonical kg value to whichever unit is currently displayed.
+  double _displayWeight(double kg) => _isMetric ? kg : kg / _kgPerLb;
 
   @override
   void initState() {
@@ -45,11 +51,20 @@ class _TrendsScreenState extends State<TrendsScreen> {
     }
   }
 
+  void _setUnitSystem(bool metric) {
+    if (metric == _isMetric) return;
+    setState(() {
+      _isMetric = metric;
+      _weightController.clear();
+    });
+  }
+
   Future<void> _logWeight() async {
-    final weight = double.tryParse(_weightController.text);
-    if (weight == null || weight <= 0) return;
+    final entered = double.tryParse(_weightController.text);
+    if (entered == null || entered <= 0) return;
+    final weightKg = _isMetric ? entered : entered * _kgPerLb;
     try {
-      await logWeight(weight);
+      await logWeight(weightKg);
       _weightController.clear();
       FocusScope.of(context).unfocus();
       await _load();
@@ -127,15 +142,19 @@ class _TrendsScreenState extends State<TrendsScreen> {
                             style: TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 12),
+                        _unitToggle(),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _weightController,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  hintText: '70.5',
-                                  suffixText: 'kg',
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                decoration: InputDecoration(
+                                  hintText: _isMetric ? '70.5' : '155',
+                                  suffixText: _isMetric ? 'kg' : 'lbs',
                                 ),
                               ),
                             ),
@@ -156,8 +175,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Weight',
-                            style: TextStyle(
+                        Text(_isMetric ? 'Weight (kg)' : 'Weight (lbs)',
+                            style: const TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 16),
                         SizedBox(
@@ -203,7 +222,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
                                             .entries
                                             .map((e) => FlSpot(
                                                 e.key.toDouble(),
-                                                e.value.weightKg))
+                                                _displayWeight(
+                                                    e.value.weightKg)))
                                             .toList(),
                                         isCurved: true,
                                         color: CalorificColors.green,
@@ -287,12 +307,10 @@ class _TrendsScreenState extends State<TrendsScreen> {
                                               barRods: [
                                                 BarChartRodData(
                                                   toY: e.value.calories,
-                                                  color:
-                                                      CalorificColors.green,
+                                                  color: CalorificColors.green,
                                                   width: 6,
                                                   borderRadius:
-                                                      BorderRadius.circular(
-                                                          3),
+                                                      BorderRadius.circular(3),
                                                 ),
                                               ],
                                             ))
@@ -307,6 +325,47 @@ class _TrendsScreenState extends State<TrendsScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  // Metric / Imperial segmented toggle — governs both the weight input and
+  // the weight chart below it.
+  Widget _unitToggle() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: CalorificColors.cream,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _unitOption('Metric', true)),
+          Expanded(child: _unitOption('Imperial', false)),
+        ],
+      ),
+    );
+  }
+
+  Widget _unitOption(String label, bool metric) {
+    final selected = _isMetric == metric;
+    return GestureDetector(
+      onTap: () => _setUnitSystem(metric),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? CalorificColors.green : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : CalorificColors.textMuted,
+          ),
+        ),
+      ),
     );
   }
 

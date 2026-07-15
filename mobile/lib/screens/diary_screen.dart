@@ -61,43 +61,45 @@ class _DiaryScreenState extends State<DiaryScreen> {
     }
   }
 
+  int _pendingWater = 0;
+
   Future<void> _handleAddWater(double amount) async {
+    // Optimistic update: bump the counter instantly. Rapid taps each bump;
+    // the server total is only reconciled once ALL in-flight requests finish,
+    // so the number never flickers backwards mid-burst.
+    setState(() => _waterMl += amount);
+    _pendingWater++;
     try {
-      final result = await addWater(amount, todayString());
-      setState(
-          () => _waterMl = (result['totalMl'] as num?)?.toDouble() ?? _waterMl);
+      await addWater(amount, todayString());
     } catch (e) {
-      _showError(e.toString());
+      if (mounted) {
+        setState(() => _waterMl -= amount);
+        _showError(e.toString());
+      }
+    } finally {
+      _pendingWater--;
+      if (_pendingWater == 0) {
+        try {
+          final water = await getWater(todayString());
+          if (mounted && _pendingWater == 0) {
+            setState(() =>
+                _waterMl = ((water['totalMl'] as num?) ?? _waterMl).toDouble());
+          }
+        } catch (_) {}
+      }
     }
   }
 
   Future<void> _handleDeleteLog(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove entry'),
-        content: const Text('Remove this food from your diary?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove',
-                style: TextStyle(color: CalorificColors.danger)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await deleteLog(id);
-        _loadDiary();
-      } catch (e) {
-        _showError(e.toString());
-      }
+    try {
+      await deleteLog(id);
+      await _loadDiary();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Removed from diary')),
+      );
+    } catch (e) {
+      _showError(e.toString());
     }
   }
 
@@ -105,6 +107,13 @@ class _DiaryScreenState extends State<DiaryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: CalorificColors.danger),
     );
+  }
+
+  // Any screen we navigate away to (goals, trends, barcode scan, settings)
+  // can change data the diary depends on, so always refresh on return.
+  Future<void> _navigateAndReload(String route, {Object? arguments}) {
+    return Navigator.pushNamed(context, route, arguments: arguments)
+        .then((_) => _loadDiary());
   }
 
   void _openFoodSearch() {
@@ -116,10 +125,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => _FoodSearchSheet(
-        onFoodLogged: () {
-          Navigator.pop(context);
-          _loadDiary();
-        },
+        onFoodLogged: _loadDiary,
       ),
     );
   }
@@ -171,16 +177,16 @@ class _DiaryScreenState extends State<DiaryScreen> {
                       Row(
                         children: [
                           _headerButton(Icons.flag_outlined,
-                              () => Navigator.pushNamed(context, '/goals')),
+                              () => _navigateAndReload('/goals')),
                           const SizedBox(width: 8),
                           _headerButton(Icons.trending_up,
-                              () => Navigator.pushNamed(context, '/trends')),
+                              () => _navigateAndReload('/trends')),
                           const SizedBox(width: 8),
                           _headerButton(Icons.qr_code_scanner,
-                              () => Navigator.pushNamed(context, '/barcode')),
+                              () => _navigateAndReload('/barcode')),
                           const SizedBox(width: 8),
                           _headerButton(Icons.settings_outlined,
-                              () => Navigator.pushNamed(context, '/settings')),
+                              () => _navigateAndReload('/settings')),
                         ],
                       ),
                     ],
@@ -247,9 +253,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
                             child: GestureDetector(
-                              onTap: () =>
-                                  Navigator.pushNamed(context, '/goals')
-                                      .then((_) => _loadDiary()),
+                              onTap: () => _navigateAndReload('/goals'),
                               child: const Text(
                                 'Set your goals to track progress →',
                                 style: TextStyle(
@@ -300,25 +304,28 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 4),
-                                        child: GestureDetector(
-                                          onTap: () =>
-                                              _handleAddWater(amt.toDouble()),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFEEF4FF),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                            child: Center(
-                                              child: Text('+${amt}ml',
-                                                  style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color:
-                                                          CalorificColors.fat)),
+                                        child: Material(
+                                          color: const Color(0xFFEEF4FF),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            onTap: () =>
+                                                _handleAddWater(amt.toDouble()),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 8),
+                                              child: Center(
+                                                child: Text('+${amt}ml',
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: CalorificColors
+                                                            .fat)),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -679,7 +686,8 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                       GestureDetector(
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.pushNamed(context, '/barcode');
+                          Navigator.pushNamed(context, '/barcode')
+                              .then((_) => widget.onFoodLogged());
                         },
                         child: Container(
                           padding: const EdgeInsets.all(12),
@@ -695,7 +703,8 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                       GestureDetector(
                         onTap: () {
                           Navigator.pop(context);
-                          Navigator.pushNamed(context, '/custom-food');
+                          Navigator.pushNamed(context, '/custom-food')
+                              .then((_) => widget.onFoodLogged());
                         },
                         child: Container(
                           padding: const EdgeInsets.all(12),
