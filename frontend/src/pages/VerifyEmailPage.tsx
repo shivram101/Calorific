@@ -64,7 +64,7 @@ function VerifyEmailPage() {
           <>
             <div style={{ fontSize: '36px', marginBottom: '12px' }}>⏳</div>
             <h1 style={{ fontSize: '19px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Verifying your email...</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px' }}>Please wait a moment.</p>
+            <p style={{ fontSize: '13px', color: '#777167', marginTop: '10px' }}>Please wait a moment.</p>
           </>
         )}
 
@@ -72,14 +72,14 @@ function VerifyEmailPage() {
           <>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
             <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Email verified!</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '13px', color: '#777167', marginTop: '10px', lineHeight: 1.6 }}>
               Your account is now active. You can log in and get started.
             </p>
             <a
               href="/login"
               style={{
                 display: 'block',
-                background: '#1FA873',
+                background: '#188159',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '14px',
@@ -100,7 +100,7 @@ function VerifyEmailPage() {
           <>
             <div style={{ fontSize: '40px', marginBottom: '12px' }}>❌</div>
             <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Verification failed</h1>
-            <p style={{ fontSize: '13px', color: '#8A8378', marginTop: '10px', lineHeight: 1.6 }}>{message}</p>
+            <p style={{ fontSize: '13px', color: '#777167', marginTop: '10px', lineHeight: 1.6 }}>{message}</p>
             <a
               href="/signup"
               style={{

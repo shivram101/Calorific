@@ -39,6 +39,7 @@ function OnboardingPage() {
 
     try {
       await updateProfile({
+        age: age ? Number(age) : null,
         sex,
         heightCm,
         weightKg,
@@ -64,7 +65,7 @@ function OnboardingPage() {
   const inputStyle = { border: 'none', outline: 'none', background: 'transparent', fontSize: '14px', color: '#2D2A26', width: '100%' };
   const tileStyle = (active: boolean) => ({
     flex: 1, padding: '16px 10px', borderRadius: '14px', textAlign: 'center' as const,
-    cursor: 'pointer', background: active ? '#1FA873' : '#FFF8ED',
+    cursor: 'pointer', background: active ? '#188159' : '#FFF8ED',
   });
   const tileLabelStyle = (active: boolean) => ({ fontSize: '12px', fontWeight: 600, color: active ? '#fff' : '#2D2A26', marginTop: '4px' });
 
@@ -82,7 +83,7 @@ function OnboardingPage() {
           </div>
           <div>
             <div style={{ fontSize: '18px', fontWeight: 600, color: '#2D2A26' }}>{stepMeta.title}</div>
-            <div style={{ fontSize: '12px', color: '#8A8378' }}>Step {step} of 3 · {stepMeta.subtitle}</div>
+            <div style={{ fontSize: '12px', color: '#777167' }}>Step {step} of 3 · {stepMeta.subtitle}</div>
           </div>
         </div>
 
@@ -94,7 +95,7 @@ function OnboardingPage() {
         </div>
 
         {error && (
-          <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#DC4C3F', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
+          <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
             {error}
           </div>
         )}
@@ -102,10 +103,10 @@ function OnboardingPage() {
         {/* Step 1: Basic info */}
         {step === 1 && (
           <form onSubmit={nextStep}>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>Age</label>
+            <label htmlFor="onboarding-age" style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' }}>Age</label>
             <div style={fieldWrapStyle}>
-              <i className="ti ti-calendar" style={{ fontSize: '16px', color: '#b5ac9d' }} />
-              <input type="number" placeholder="25" value={age} onChange={e => setAge(e.target.value)} style={inputStyle} />
+              <i className="ti ti-calendar" style={{ fontSize: '16px', color: '#b5ac9d' }} aria-hidden="true" />
+              <input id="onboarding-age" type="number" placeholder="25" value={age} onChange={e => setAge(e.target.value)} style={inputStyle} />
             </div>
 
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '10px' }}>Sex</label>
@@ -120,7 +121,7 @@ function OnboardingPage() {
               </div>
             </div>
 
-            <button type="submit" style={{ width: '100%', background: '#1FA873', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>
+            <button type="submit" style={{ width: '100%', background: '#188159', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>
               Continue
             </button>
           </form>
@@ -130,34 +131,34 @@ function OnboardingPage() {
         {step === 2 && (
           <form onSubmit={nextStep}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: '#2D2A26' }}>Height</label>
+              <label htmlFor="onboarding-height" style={{ fontSize: '12px', fontWeight: 500, color: '#2D2A26' }}>Height</label>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {(['cm', 'in'] as const).map(u => (
-                  <span key={u} onClick={() => setHeightUnit(u)} style={{ fontSize: '11px', fontWeight: 600, color: heightUnit === u ? '#1FA873' : '#8A8378', cursor: 'pointer' }}>{u}</span>
+                  <span key={u} onClick={() => setHeightUnit(u)} style={{ fontSize: '11px', fontWeight: 600, color: heightUnit === u ? '#188159' : '#777167', cursor: 'pointer' }}>{u}</span>
                 ))}
               </div>
             </div>
             <div style={fieldWrapStyle}>
-              <i className="ti ti-ruler-2" style={{ fontSize: '16px', color: '#b5ac9d' }} />
-              <input type="number" placeholder={heightUnit === 'cm' ? '175' : '69'} value={height} onChange={e => setHeight(e.target.value)} style={inputStyle} />
+              <i className="ti ti-ruler-2" style={{ fontSize: '16px', color: '#b5ac9d' }} aria-hidden="true" />
+              <input id="onboarding-height" type="number" placeholder={heightUnit === 'cm' ? '175' : '69'} value={height} onChange={e => setHeight(e.target.value)} style={inputStyle} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <label style={{ fontSize: '12px', fontWeight: 500, color: '#2D2A26' }}>Weight</label>
+              <label htmlFor="onboarding-weight" style={{ fontSize: '12px', fontWeight: 500, color: '#2D2A26' }}>Weight</label>
               <div style={{ display: 'flex', gap: '6px' }}>
                 {(['kg', 'lbs'] as const).map(u => (
-                  <span key={u} onClick={() => setWeightUnit(u)} style={{ fontSize: '11px', fontWeight: 600, color: weightUnit === u ? '#1FA873' : '#8A8378', cursor: 'pointer' }}>{u}</span>
+                  <span key={u} onClick={() => setWeightUnit(u)} style={{ fontSize: '11px', fontWeight: 600, color: weightUnit === u ? '#188159' : '#777167', cursor: 'pointer' }}>{u}</span>
                 ))}
               </div>
             </div>
             <div style={{ ...fieldWrapStyle, marginBottom: '28px' }}>
-              <i className="ti ti-weight" style={{ fontSize: '16px', color: '#b5ac9d' }} />
-              <input type="number" placeholder={weightUnit === 'kg' ? '70' : '155'} value={weight} onChange={e => setWeight(e.target.value)} style={inputStyle} />
+              <i className="ti ti-weight" style={{ fontSize: '16px', color: '#b5ac9d' }} aria-hidden="true" />
+              <input id="onboarding-weight" type="number" placeholder={weightUnit === 'kg' ? '70' : '155'} value={weight} onChange={e => setWeight(e.target.value)} style={inputStyle} />
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" onClick={prevStep} style={{ flex: 1, background: '#FFF8ED', color: '#2D2A26', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Back</button>
-              <button type="submit" style={{ flex: 2, background: '#1FA873', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>Continue</button>
+              <button type="submit" style={{ flex: 2, background: '#188159', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>Continue</button>
             </div>
           </form>
         )}
@@ -174,7 +175,7 @@ function OnboardingPage() {
                 { label: 'Very active', icon: '🏋️' },
               ].map(({ label, icon }) => (
                 <div key={label} onClick={() => setActivityLevel(label)}
-                  style={{ padding: '13px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: activityLevel === label ? '#1FA873' : '#FFF8ED', color: activityLevel === label ? '#fff' : '#2D2A26' }}>
+                  style={{ padding: '13px 16px', borderRadius: '12px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', background: activityLevel === label ? '#188159' : '#FFF8ED', color: activityLevel === label ? '#fff' : '#2D2A26' }}>
                   <span style={{ fontSize: '16px' }}>{icon}</span>{label}
                 </div>
               ))}
@@ -192,7 +193,7 @@ function OnboardingPage() {
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" onClick={prevStep} style={{ flex: 1, background: '#FFF8ED', color: '#2D2A26', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Back</button>
-              <button type="submit" style={{ flex: 2, background: '#1FA873', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>Finish</button>
+              <button type="submit" style={{ flex: 2, background: '#188159', color: '#fff', border: 'none', borderRadius: '14px', padding: '13px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' }}>Finish</button>
             </div>
           </form>
         )}
