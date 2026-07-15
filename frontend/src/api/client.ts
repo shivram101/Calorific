@@ -7,7 +7,8 @@
 //   import { login, register, searchFoods, getLogs } from '../api/client';
 //   const { token, user } = await login('email@test.com', 'password123');
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = "https://contactmanager24.xyz/api"
+;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 // The JWT is stored in localStorage after login and attached to every
