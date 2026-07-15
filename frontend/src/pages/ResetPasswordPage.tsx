@@ -1,3 +1,7 @@
+// src/pages/ResetPasswordPage.tsx
+// FIXED: Was reading token as ?token= query param — API expects it as path param.
+// Also updated to use centralized API client and check data.error not data.message.
+
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { resetPassword } from '../api/client';
