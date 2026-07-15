@@ -32,8 +32,10 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
     try {
       final food = await lookupBarcode(barcode);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/food-detail',
+      await Navigator.pushNamed(context, '/food-detail',
           arguments: {'foodId': food.id});
+      if (!mounted) return;
+      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -121,10 +123,20 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
                   height: 160,
                   child: Stack(
                     children: [
-                      _corner(top: 0, left: 0, topBorder: true, leftBorder: true),
-                      _corner(top: 0, right: 0, topBorder: true, rightBorder: true),
-                      _corner(bottom: 0, left: 0, bottomBorder: true, leftBorder: true),
-                      _corner(bottom: 0, right: 0, bottomBorder: true, rightBorder: true),
+                      _corner(
+                          top: 0, left: 0, topBorder: true, leftBorder: true),
+                      _corner(
+                          top: 0, right: 0, topBorder: true, rightBorder: true),
+                      _corner(
+                          bottom: 0,
+                          left: 0,
+                          bottomBorder: true,
+                          leftBorder: true),
+                      _corner(
+                          bottom: 0,
+                          right: 0,
+                          bottomBorder: true,
+                          rightBorder: true),
                     ],
                   ),
                 ),
@@ -143,8 +155,8 @@ class _BarcodeScreenState extends State<BarcodeScreen> {
                 if (_loading)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 60),
-                    child: CircularProgressIndicator(
-                        color: CalorificColors.green),
+                    child:
+                        CircularProgressIndicator(color: CalorificColors.green),
                   ),
               ],
             ),
