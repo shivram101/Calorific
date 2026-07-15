@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches the light-green tint used for the macro summary card on the
+         diary screen (0xFFF0FBF6), so the adaptive icon background reads as
+         "Calorific brand" rather than a generic color. Adjust if your actual
+         CalorificColors.cream/greenLight value differs. -->
+    <color name="ic_launcher_background">#F0FBF6</color>
+</resources>

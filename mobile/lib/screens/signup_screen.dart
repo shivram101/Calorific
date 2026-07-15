@@ -21,13 +21,39 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _error;
   String? _success;
 
+  static final RegExp _symbolPattern =
+      RegExp(r'''[!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?~`]''');
+
+  bool get _hasMinLength => _passwordController.text.length >= 8;
+  bool get _hasUppercase => RegExp(r'[A-Z]').hasMatch(_passwordController.text);
+  bool get _hasLowercase => RegExp(r'[a-z]').hasMatch(_passwordController.text);
+  bool get _hasNumber => RegExp(r'[0-9]').hasMatch(_passwordController.text);
+  bool get _hasSymbols =>
+      _symbolPattern.allMatches(_passwordController.text).length >= 2;
+
+  bool get _isPasswordValid =>
+      _hasMinLength &&
+      _hasUppercase &&
+      _hasLowercase &&
+      _hasNumber &&
+      _hasSymbols;
+
+  bool get _passwordsMatch =>
+      _passwordController.text.isNotEmpty &&
+      _passwordController.text == _confirmController.text;
+
   Future<void> _handleSignUp() async {
     setState(() {
       _error = null;
       _success = null;
     });
 
-    if (_passwordController.text != _confirmController.text) {
+    if (!_isPasswordValid) {
+      setState(() => _error = 'Password does not meet the requirements below');
+      return;
+    }
+
+    if (!_passwordsMatch) {
       setState(() => _error = 'Passwords do not match');
       return;
     }
@@ -66,6 +92,78 @@ class _SignupScreenState extends State<SignupScreen> {
           ),
         ),
       );
+
+  Widget _requirementRow(bool met, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color: met ? CalorificColors.green : CalorificColors.textMuted,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: met ? CalorificColors.green : CalorificColors.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Live checklist shown under the password field — updates as the person
+  // types via the field's onChanged callback.
+  Widget _passwordRequirements() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: CalorificColors.cream,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _requirementRow(_hasMinLength, 'At least 8 characters'),
+          _requirementRow(_hasUppercase, 'One uppercase letter'),
+          _requirementRow(_hasLowercase, 'One lowercase letter'),
+          _requirementRow(_hasNumber, 'One number'),
+          _requirementRow(_hasSymbols, 'Two or more symbols (!@#\$...)'),
+        ],
+      ),
+    );
+  }
+
+  // Separate from the checklist above since it depends on both fields —
+  // shown neutral until the person starts confirming, then green/red.
+  Widget _matchIndicator() {
+    final confirmEmpty = _confirmController.text.isEmpty;
+    final icon = confirmEmpty
+        ? Icons.circle_outlined
+        : (_passwordsMatch ? Icons.check_circle : Icons.cancel);
+    final color = confirmEmpty
+        ? CalorificColors.textMuted
+        : (_passwordsMatch ? CalorificColors.green : CalorificColors.danger);
+    final label = confirmEmpty || _passwordsMatch
+        ? 'Passwords match'
+        : 'Passwords do not match';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 11, color: color)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +254,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   _label('Full name'),
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(hintText: 'John Doe'),
+                    decoration: const InputDecoration(
+                        hintText:
+                            'John'), // removing last name hint to avoid confusion
                   ),
                   const SizedBox(height: 14),
 
@@ -174,22 +274,30 @@ class _SignupScreenState extends State<SignupScreen> {
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(hintText: '••••••••'),
                   ),
+                  const SizedBox(height: 10),
+                  _passwordRequirements(),
                   const SizedBox(height: 14),
 
                   _label('Confirm password'),
                   TextField(
                     controller: _confirmController,
                     obscureText: true,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(hintText: '••••••••'),
                   ),
+                  _matchIndicator(),
                   const SizedBox(height: 20),
 
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _loading ? null : _handleSignUp,
+                      onPressed:
+                          (_loading || !_isPasswordValid || !_passwordsMatch)
+                              ? null
+                              : _handleSignUp,
                       child: Text(_loading ? 'Signing up...' : 'Sign Up'),
                     ),
                   ),

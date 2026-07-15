@@ -165,26 +165,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Log out'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Log out')),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await logout();
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
-      }
+    await logout();
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/login', (r) => false);
     }
   }
 
