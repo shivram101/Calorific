@@ -39,6 +39,7 @@ function OnboardingPage() {
 
     try {
       await updateProfile({
+        age: age ? Number(age) : null,
         sex,
         heightCm,
         weightKg,

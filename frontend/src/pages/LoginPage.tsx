@@ -3,7 +3,7 @@
 // login() handles storing the JWT automatically.
 
 import { useState } from 'react';
-import { login } from '../api/client';
+import { login, getProfile } from '../api/client';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
@@ -15,7 +15,10 @@ function LoginPage() {
     setError('');
     try {
       await login(email, password);
-      window.location.href = '/Dashboard';
+      // First-time users haven't completed onboarding yet (goal is null
+      // until the onboarding form saves it) — send them there first.
+      const profile = await getProfile();
+      window.location.href = profile.goal ? '/Dashboard' : '/onboarding';
     } catch (err: any) {
       setError(err.message || 'Login failed');
     }
