@@ -161,7 +161,7 @@ function DashboardPage() {
           <div style={styles.ribbonItem}>Log</div>
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/goals')}>Goals</div>
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={styles.ribbonItemMuted}>Settings</div>
+          <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
         </div>
         <div style={styles.ribbonRight}>
           <div style={styles.userTag}>Logged in</div>
