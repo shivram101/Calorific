@@ -58,13 +58,32 @@ class _DiaryScreenState extends State<DiaryScreen> {
     }
   }
 
+  int _pendingWater = 0;
+
   Future<void> _handleAddWater(double amount) async {
+    // Optimistic update: bump the counter instantly. Rapid taps each bump;
+    // the server total is only reconciled once ALL in-flight requests finish,
+    // so the number never flickers backwards mid-burst.
+    setState(() => _waterMl += amount);
+    _pendingWater++;
     try {
-      final result = await addWater(amount, todayString());
-      setState(() =>
-          _waterMl = (result['totalMl'] as num?)?.toDouble() ?? _waterMl);
+      await addWater(amount, todayString());
     } catch (e) {
-      _showError(e.toString());
+      if (mounted) {
+        setState(() => _waterMl -= amount);
+        _showError(e.toString());
+      }
+    } finally {
+      _pendingWater--;
+      if (_pendingWater == 0) {
+        try {
+          final water = await getWater(todayString());
+          if (mounted && _pendingWater == 0) {
+            setState(() => _waterMl =
+                ((water['totalMl'] as num?) ?? _waterMl).toDouble());
+          }
+        } catch (_) {}
+      }
     }
   }
 
@@ -113,10 +132,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => _FoodSearchSheet(
-        onFoodLogged: () {
-          Navigator.pop(context);
-          _loadDiary();
-        },
+        onFoodLogged: _loadDiary,
       ),
     );
   }
@@ -264,25 +280,27 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                       child: Padding(
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 4),
-                                        child: GestureDetector(
-                                          onTap: () =>
-                                              _handleAddWater(amt.toDouble()),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 8),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFEEF4FF),
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                            ),
-                                            child: Center(
-                                              child: Text('+${amt}ml',
-                                                  style: const TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: CalorificColors
-                                                          .fat)),
+                                        child: Material(
+                                          color: const Color(0xFFEEF4FF),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          child: InkWell(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                            onTap: () => _handleAddWater(
+                                                amt.toDouble()),
+                                            child: Padding(
+                                              padding: const EdgeInsets
+                                                  .symmetric(vertical: 8),
+                                              child: Center(
+                                                child: Text('+${amt}ml',
+                                                    style: const TextStyle(
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: CalorificColors
+                                                            .fat)),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -637,7 +655,9 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                   final food = _results[index];
                   return GestureDetector(
                     onTap: () {
-                      Navigator.pop(context);
+                      // Keep the search sheet open underneath — backing out of
+                      // a food's detail returns to the results instead of
+                      // losing the search.
                       Navigator.pushNamed(
                         context,
                         '/food-detail',

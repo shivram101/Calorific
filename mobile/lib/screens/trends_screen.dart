@@ -52,7 +52,12 @@ class _TrendsScreenState extends State<TrendsScreen> {
       await logWeight(weight);
       _weightController.clear();
       FocusScope.of(context).unfocus();
-      _load();
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Weight logged'),
+            backgroundColor: CalorificColors.green));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -157,10 +162,10 @@ class _TrendsScreenState extends State<TrendsScreen> {
                         const SizedBox(height: 16),
                         SizedBox(
                           height: 180,
-                          child: _weights.length < 2
-                              ? const Center(
+                          child: _weights.isEmpty
+                              ? Center(
                                   child: Text(
-                                      'Log weight on at least 2 days to see your trend',
+                                      'Log your weight to start the trend',
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: CalorificColors.textMuted)))
@@ -262,7 +267,8 @@ class _TrendsScreenState extends State<TrendsScreen> {
                                       leftTitles: AxisTitles(
                                         sideTitles: SideTitles(
                                           showTitles: true,
-                                          reservedSize: 40,
+                                          reservedSize: 44,
+                                          interval: 500,
                                           getTitlesWidget: (v, _) => Text(
                                               v.round().toString(),
                                               style: const TextStyle(
