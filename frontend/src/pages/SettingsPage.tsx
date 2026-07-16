@@ -179,7 +179,7 @@ function SettingsPage() {
     borderRadius: '14px',
     textAlign: 'center' as const,
     cursor: 'pointer',
-    background: active ? '#1FA873' : '#FFF8ED',
+    background: active ? '#188159' : '#FFF8ED',
   });
 
   const tileLabelStyle = (active: boolean) => ({
@@ -192,7 +192,7 @@ function SettingsPage() {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#FFF8ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#8A8378', fontSize: '13px' }}>Loading settings...</p>
+        <p style={{ color: '#777167', fontSize: '13px' }}>Loading settings...</p>
       </div>
     );
   }
@@ -206,7 +206,7 @@ function SettingsPage() {
           <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>Log</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/goals')}>Goals</div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 }}>Settings</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #188159', paddingBottom: 2 }}>Settings</div>
         </div>
         <button style={{ background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13 }} onClick={logout}>Logout</button>
       </div>
@@ -221,7 +221,7 @@ function SettingsPage() {
         </div>
 
         {message && (
-          <div style={{ background: '#E1F5EE', border: '1px solid #1FA873', color: '#0F6E56', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
+          <div style={{ background: '#E1F5EE', border: '1px solid #188159', color: '#0F6E56', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
             {message}
           </div>
         )}
@@ -239,7 +239,7 @@ function SettingsPage() {
             <span style={{ fontSize: '13px', color: '#2D2A26' }}>{email}</span>
           </div>
           {isVerified ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#1FA873', fontWeight: 500 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#188159', fontWeight: 500 }}>
               <i className="ti ti-circle-check" aria-hidden="true"></i>
               Email verified
             </div>
@@ -278,7 +278,7 @@ function SettingsPage() {
             {(['metric', 'us'] as UnitSystem[]).map(u => (
               <button key={u} onClick={() => switchUnitSystem(u)}
                 style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer',
-                  background: unitSystem === u ? '#1FA873' : 'transparent',
+                  background: unitSystem === u ? '#188159' : 'transparent',
                   color: unitSystem === u ? '#fff' : '#777167' }}>
                 {u === 'us' ? '🇺🇸 US (lbs, ft/in)' : '📏 Metric (kg, cm)'}
               </button>
@@ -290,26 +290,26 @@ function SettingsPage() {
               <>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Height (ft)</label>
-                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 5" />
+                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 5" aria-label="Height in feet" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Height (in)</label>
-                  <input type="number" style={inputStyle} value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="e.g. 10" />
+                  <input type="number" style={inputStyle} value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="e.g. 10" aria-label="Height in inches" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Weight (lbs)</label>
-                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 160" />
+                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 160" aria-label="Weight in pounds" />
                 </div>
               </>
             ) : (
               <>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Height (cm)</label>
-                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 175" />
+                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 175" aria-label="Height in centimeters" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Weight (kg)</label>
-                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 70" />
+                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 70" aria-label="Weight in kilograms" />
                 </div>
               </>
             )}
@@ -336,7 +336,7 @@ function SettingsPage() {
                   borderRadius: '12px',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  background: activityLevel === label ? '#1FA873' : '#FFF8ED',
+                  background: activityLevel === label ? '#188159' : '#FFF8ED',
                   color: activityLevel === label ? '#fff' : '#2D2A26',
                   fontSize: '12px',
                   fontWeight: 600,
@@ -361,8 +361,8 @@ function SettingsPage() {
               <div key={value} onClick={() => setGoal(value)}
                 style={{
                   flex: '1 1 45%', padding: '14px 12px', borderRadius: '14px', cursor: 'pointer',
-                  background: goal === value ? '#1FA873' : '#FFF8ED',
-                  border: goal === value ? '2px solid #1FA873' : '2px solid transparent',
+                  background: goal === value ? '#188159' : '#FFF8ED',
+                  border: goal === value ? '2px solid #188159' : '2px solid transparent',
                 }}>
                 <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: goal === value ? '#fff' : '#2D2A26' }}>{label}</div>
@@ -378,7 +378,7 @@ function SettingsPage() {
           disabled={saving}
           style={{
             width: '100%',
-            background: '#1FA873',
+            background: '#188159',
             color: '#fff',
             border: 'none',
             borderRadius: '14px',
@@ -419,7 +419,7 @@ function SettingsPage() {
         {/* Danger zone */}
         <div style={{ ...cardStyle, border: '1px solid #F3D9D5' }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#c24337', marginBottom: '6px' }}>Danger zone</div>
-          <p style={{ fontSize: '12px', color: '#8A8378', margin: '0 0 14px 0', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '12px', color: '#777167', margin: '0 0 14px 0', lineHeight: 1.5 }}>
             Permanently delete your account and all logged data. This cannot be undone.
           </p>
           <button

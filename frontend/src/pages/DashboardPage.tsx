@@ -387,7 +387,7 @@ function DashboardPage() {
               </div>
             </div>
             <div style={{ background: '#F0EDE8', borderRadius: 6, height: 8, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(GOALS.calories > 0 ? (totals.calories / GOALS.calories) * 100 : 0, 100)}%`, background: totals.calories > GOALS.calories ? '#c24337' : '#1FA873', borderRadius: 6, transition: 'width 0.4s' }} />
+              <div style={{ height: '100%', width: `${Math.min(GOALS.calories > 0 ? (totals.calories / GOALS.calories) * 100 : 0, 100)}%`, background: totals.calories > GOALS.calories ? '#c24337' : '#188159', borderRadius: 6, transition: 'width 0.4s' }} />
             </div>
           </div>
 
@@ -411,7 +411,7 @@ function DashboardPage() {
 
           {/* Daily micronutrients button */}
           <button onClick={handleViewDailyMicronutrients}
-            style={{ padding: '12px', background: '#fff', border: '1.5px solid #1FA873', borderRadius: 12, color: '#188159', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            style={{ padding: '12px', background: '#fff', border: '1.5px solid #188159', borderRadius: 12, color: '#188159', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
             🔬 View Today's Micronutrients
           </button>
         </div>
@@ -464,7 +464,7 @@ function DashboardPage() {
       <div style={S.card}>
         <h2 style={{ margin: '0 0 20px', fontSize: 18 }}>Goals</h2>
         <div style={{ display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 20 }}>
-          <ProgressRing value={Math.round(totals.calories)} max={GOALS.calories} color="#1FA873" label="Calories" unit="kcal" />
+          <ProgressRing value={Math.round(totals.calories)} max={GOALS.calories} color="#188159" label="Calories" unit="kcal" />
           <ProgressRing value={Math.round(totals.protein)} max={GOALS.protein} color="#DC4C3F" label="Protein" unit="g" />
           <ProgressRing value={Math.round(totals.carbs)} max={GOALS.carbs} color="#EF9F27" label="Carbs" unit="g" />
           <ProgressRing value={Math.round(totals.fat)} max={GOALS.fat} color="#378ADD" label="Fat" unit="g" />
@@ -486,7 +486,7 @@ function DashboardPage() {
               {(['search', 'custom'] as Array<'search' | 'custom'>).map(tab => (
                 <button key={tab} onClick={() => { setModalTab(tab); setModalError(''); setCustomSuccess(''); }}
                   style={{ flex: 1, padding: 9, borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                    background: modalTab === tab ? '#1FA873' : 'transparent',
+                    background: modalTab === tab ? '#188159' : 'transparent',
                     color: modalTab === tab ? '#fff' : '#777167' }}>
                   {tab === 'search' ? '🔍 Search Foods' : '✏️ Create Custom'}
                 </button>
@@ -499,10 +499,10 @@ function DashboardPage() {
             {modalTab === 'search' && (
               <div>
                 <div style={{ position: 'relative', marginBottom: 14 }}>
-                  <input autoFocus placeholder="Search foods..." value={modalQuery} onChange={e => setModalQuery(e.target.value)}
+                  <input autoFocus aria-label="Search foods" placeholder="Search foods..." value={modalQuery} onChange={e => setModalQuery(e.target.value)}
                     style={{ width: '100%', padding: '10px 40px 10px 14px', borderRadius: 10, background: '#FFF8ED', border: '1px solid #E8E4DC', fontSize: 14, boxSizing: 'border-box' }} />
                   {modalSearching && (
-                    <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#aaa' }}>⏳</div>
+                    <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: '#777167' }}>⏳</div>
                   )}
                 </div>
 
@@ -514,11 +514,11 @@ function DashboardPage() {
                         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 14px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5' }}>
                         <div>
                           <div style={{ fontSize: 14, fontWeight: 600, color: '#2D2A26' }}>{food.name}</div>
-                          {food.brand && <div style={{ fontSize: 11, color: '#aaa', marginTop: 1 }}>{food.brand}</div>}
+                          {food.brand && <div style={{ fontSize: 11, color: '#777167', marginTop: 1 }}>{food.brand}</div>}
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
                           <div style={{ fontSize: 14, fontWeight: 700, color: '#188159' }}>{food.calories} kcal</div>
-                          <div style={{ fontSize: 11, color: '#aaa' }}>{food.protein}g P · {food.carbs}g C · {food.fat}g F</div>
+                          <div style={{ fontSize: 11, color: '#777167' }}>{food.protein}g P · {food.carbs}g C · {food.fat}g F</div>
                         </div>
                       </div>
                     ))}
@@ -526,7 +526,7 @@ function DashboardPage() {
                 )}
 
                 {modalResults.length === 0 && !modalSearching && modalQuery.trim() && (
-                  <p style={{ fontSize: 13, color: '#aaa', textAlign: 'center', padding: '20px 0' }}>
+                  <p style={{ fontSize: 13, color: '#777167', textAlign: 'center', padding: '20px 0' }}>
                     No results — try a different term or create a custom food.
                   </p>
                 )}
@@ -568,19 +568,19 @@ function DashboardPage() {
             {modalTab === 'custom' && (
               <form onSubmit={handleCreateCustomFood}>
                 {customSuccess && (
-                  <div style={{ background: '#F0FBF6', border: '1px solid #1FA873', color: '#0F6E56', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
+                  <div style={{ background: '#F0FBF6', border: '1px solid #188159', color: '#0F6E56', borderRadius: 10, padding: '10px 14px', fontSize: 13, marginBottom: 14 }}>
                     {customSuccess}
                   </div>
                 )}
                 <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
                   <div style={{ flex: 2 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: '#2D2A26', display: 'block', marginBottom: 4 }}>Food name *</label>
-                    <input required value={customName} onChange={e => setCustomName(e.target.value)}
+                    <input required aria-label="Food name" value={customName} onChange={e => setCustomName(e.target.value)}
                       placeholder="e.g. Homemade granola" style={fieldStyle} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: '#2D2A26', display: 'block', marginBottom: 4 }}>Calories *</label>
-                    <input required type="number" min="0" value={customCalories} onChange={e => setCustomCalories(e.target.value)}
+                    <input required aria-label="Calories" type="number" min="0" value={customCalories} onChange={e => setCustomCalories(e.target.value)}
                       placeholder="kcal" style={fieldStyle} />
                   </div>
                 </div>
@@ -592,7 +592,7 @@ function DashboardPage() {
                   ].map(({ label, val, setter }) => (
                     <div key={label}>
                       <label style={{ fontSize: 12, fontWeight: 600, color: '#2D2A26', display: 'block', marginBottom: 4 }}>{label}</label>
-                      <input type="number" min="0" step="0.1" value={val} onChange={e => setter(e.target.value)}
+                      <input type="number" min="0" step="0.1" aria-label={label} value={val} onChange={e => setter(e.target.value)}
                         placeholder="0" style={fieldStyle} />
                     </div>
                   ))}
@@ -612,7 +612,7 @@ function DashboardPage() {
                   </div>
                 </div>
                 <button type="submit" disabled={customCreating}
-                  style={{ width: '100%', padding: 12, background: '#1FA873', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+                  style={{ width: '100%', padding: 12, background: '#188159', color: '#fff', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
                   {customCreating ? 'Creating...' : 'Create Food'}
                 </button>
               </form>
@@ -716,7 +716,7 @@ const S: any = {
   page:         { minHeight: '100vh', background: '#FFF8ED', padding: 20, fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 15 },
   ribbon:       { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand:        { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
-  navActive:    { fontSize: 13, fontWeight: 600, color: '#2D2A26', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
+  navActive:    { fontSize: 13, fontWeight: 600, color: '#2D2A26', borderBottom: '2px solid #188159', paddingBottom: 2 },
   navMuted:     { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   userTag:      { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
   logoutBtn:    { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },

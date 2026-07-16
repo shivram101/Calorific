@@ -15,11 +15,13 @@ function getPasswordStrength(password: string): { score: number; label: string; 
     if (/[^A-Za-z0-9]/.test(password)) score++;
 
     const levels = [
-        { label: 'Very weak', color: '#DC4C3F' },
-        { label: 'Weak', color: '#DC4C3F' },
-        { label: 'Fair', color: '#EF9F27' },
-        { label: 'Good', color: '#EFC927' },
-        { label: 'Strong', color: '#8BC34A' },
+        // Colors chosen to pass WCAG AA contrast (4.5:1) on white,
+        // since they're also used for the 11px strength label text.
+        { label: 'Very weak', color: '#c24337' },
+        { label: 'Weak', color: '#c24337' },
+        { label: 'Fair', color: '#B45309' },
+        { label: 'Good', color: '#946300' },
+        { label: 'Strong', color: '#4F7A28' },
         { label: 'Very strong', color: '#188159' },
     ];
 
@@ -78,7 +80,7 @@ function SignUpPage() {
                 )}
 
                 {success && (
-                    <div style={{ background: '#E1F5EE', border: '1px solid #1FA873', color: '#0F6E56', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
+                    <div style={{ background: '#E1F5EE', border: '1px solid #188159', color: '#0F6E56', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
                         {success}
                     </div>
                 )}

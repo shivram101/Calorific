@@ -538,6 +538,7 @@ function ProgressPage() {
               <form onSubmit={handleDayLogWeight} style={{ display: 'flex', gap: 8 }}>
                 <input
                   type="number" step="0.1"
+                  aria-label={`Weight in ${unit}`}
                   placeholder={`Weight (${unit})`}
                   value={dayWeightInput}
                   onChange={e => setDayWeightInput(e.target.value)}
@@ -587,6 +588,7 @@ function ProgressPage() {
               {/* Food search */}
               <form onSubmit={handleDaySearch} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                 <input
+                  aria-label="Search foods to add"
                   placeholder="Search foods to add..."
                   value={daySearch}
                   onChange={e => setDaySearch(e.target.value)}
@@ -623,10 +625,10 @@ function ProgressPage() {
                     {daySelectedFood.calories} kcal · {daySelectedFood.protein}g P · {daySelectedFood.carbs}g C · {daySelectedFood.fat}g F per serving
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input type="number" min="0.1" step="0.1" value={dayQuantity}
+                    <input type="number" min="0.1" step="0.1" aria-label="Servings" value={dayQuantity}
                       onChange={e => setDayQuantity(Number(e.target.value))}
                       style={{ ...styles.modalInput, width: 70 }} />
-                    <select value={dayMeal} onChange={e => setDayMeal(e.target.value as Meal)}
+                    <select aria-label="Meal" value={dayMeal} onChange={e => setDayMeal(e.target.value as Meal)}
                       style={{ ...styles.modalInput, flex: 1 }}>
                       {(['breakfast', 'lunch', 'dinner', 'snack'] as Meal[]).map(m => (
                         <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
@@ -692,7 +694,7 @@ function CalendarDay({
       title={logged ? `${date}: ${day!.calories} kcal` : date}
       aria-label={`${date}${logged ? `, ${day!.calories} calories` : ', nothing logged'}`}
       style={{
-        border: isToday && !selected ? '1.5px solid #1FA873' : '1.5px solid transparent',
+        border: isToday && !selected ? '1.5px solid #188159' : '1.5px solid transparent',
         background,
         color,
         borderRadius: 8,
@@ -741,9 +743,9 @@ function WeightChart({ entries }: { entries: WeightEntry[] }) {
       <line x1={PAD} y1={H - PAD} x2={W - PAD} y2={H - PAD} stroke="#EFE9DE" strokeWidth="1" />
       <text x={PAD - 6} y={y(max) + 4} textAnchor="end" fontSize="10" fill="#777167">{max}</text>
       <text x={PAD - 6} y={y(min) + 4} textAnchor="end" fontSize="10" fill="#777167">{min}</text>
-      <polyline points={points} fill="none" stroke="#1FA873" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={points} fill="none" stroke="#188159" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
       {entries.map((e, i) => (
-        <circle key={e._id} cx={x(i)} cy={y(e.weightKg)} r="3" fill="#1FA873">
+        <circle key={e._id} cx={x(i)} cy={y(e.weightKg)} r="3" fill="#188159">
           <title>{`${e.date}: ${e.weightKg} kg`}</title>
         </circle>
       ))}
@@ -776,7 +778,7 @@ function CalorieChart({ days, target }: { days: DailySummary[]; target: number |
           width={barW}
           height={d.calories > 0 ? H - PAD - y(d.calories) : 1}
           rx={barW > 4 ? 2 : 0}
-          fill={d.calories > 0 ? '#1FA873' : '#EFE9DE'}
+          fill={d.calories > 0 ? '#188159' : '#EFE9DE'}
         >
           <title>{`${d.date}: ${Math.round(d.calories)} kcal`}</title>
         </rect>
@@ -806,7 +808,7 @@ const styles: any = {
   page: { minHeight: '100vh', background: '#FFF8ED', padding: 20, fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 15 },
   ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand: { fontSize: 16, fontWeight: 700, color: '#2D2A26' },
-  ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
+  ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #188159', paddingBottom: 2 },
   ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
   userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
@@ -816,7 +818,7 @@ const styles: any = {
 
   rangeRow: { display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' },
   rangeBtn: { padding: '7px 14px', borderRadius: 10, border: '1px solid #EFE9DE', background: '#fff', color: '#777167', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
-  rangeActive: { padding: '7px 14px', borderRadius: 10, border: '1px solid #1FA873', background: '#188159', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+  rangeActive: { padding: '7px 14px', borderRadius: 10, border: '1px solid #188159', background: '#188159', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
 
   statRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
   statCard: { flex: '1 1 140px', background: '#fff', borderRadius: 14, padding: '12px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },

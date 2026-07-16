@@ -227,11 +227,11 @@ function GoalsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {GOAL_OPTIONS.map(({ type, label, sub, icon }) => (
               <button key={type} onClick={() => applyPreset(type)} disabled={suggestedLoading}
-                style={{ padding: '14px 10px', borderRadius: 12, border: `2px solid ${goalType === type ? '#1FA873' : '#E8E4DC'}`,
+                style={{ padding: '14px 10px', borderRadius: 12, border: `2px solid ${goalType === type ? '#188159' : '#E8E4DC'}`,
                   background: goalType === type ? '#F0FBF6' : '#FAFAFA', cursor: 'pointer', textAlign: 'center' as const }}>
                 <span style={{ fontSize: 22, display: 'block', marginBottom: 6 }}>{icon}</span>
                 <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: goalType === type ? '#188159' : '#2D2A26' }}>{label}</span>
-                <span style={{ display: 'block', fontSize: 11, color: goalType === type ? '#1FA873' : '#aaa', marginTop: 3 }}>{sub}</span>
+                <span style={{ display: 'block', fontSize: 11, color: goalType === type ? '#188159' : '#777167', marginTop: 3 }}>{sub}</span>
               </button>
             ))}
           </div>
@@ -268,7 +268,7 @@ function GoalsPage() {
                       style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: `2px solid ${color}`, background: '#FFF8ED', fontSize: 13, fontWeight: 600, color: '#2D2A26', minWidth: 0 }} />
                     <span style={{ fontSize: 12, color: '#777167' }}>g</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{goals[key] * mult} kcal</div>
+                  <div style={{ fontSize: 11, color: '#777167', marginTop: 4 }}>{goals[key] * mult} kcal</div>
                 </div>
               </div>
             ))}
@@ -310,7 +310,7 @@ function GoalsPage() {
 
               {/* Custom input */}
               <div style={{ display: 'flex', gap: 8 }}>
-                <input type="number" placeholder="Custom ml..." value={waterInput}
+                <input type="number" aria-label="Custom water goal in ml" placeholder="Custom ml..." value={waterInput}
                   onChange={e => setWaterInput(e.target.value)}
                   style={{ flex: 1, padding: '7px 10px', borderRadius: 9, border: '1px solid #c5ddf5', background: '#f0f6ff', fontSize: 13 }} />
                 <button onClick={() => { const v = Number(waterInput); if (v > 0) saveWaterTarget(v); }}
@@ -337,11 +337,11 @@ function GoalsPage() {
 
           {/* Last 14 days mini heatmap */}
           <div style={{ marginTop: 4 }}>
-            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>Last 14 days</div>
+            <div style={{ fontSize: 11, color: '#777167', marginBottom: 6 }}>Last 14 days</div>
             <div style={{ display: 'flex', gap: 5 }}>
               {recentDays.map(({ date, logged }) => (
                 <div key={date} title={date}
-                  style={{ flex: 1, height: 28, borderRadius: 6, background: logged ? '#1FA873' : '#F0EDE8', transition: 'background 0.2s' }} />
+                  style={{ flex: 1, height: 28, borderRadius: 6, background: logged ? '#188159' : '#F0EDE8', transition: 'background 0.2s' }} />
               ))}
               {/* Fill remaining slots if fewer than 14 days of data */}
               {Array.from({ length: Math.max(0, 14 - recentDays.length) }).map((_, i) => (
@@ -366,7 +366,7 @@ const S: any = {
   page:      { minHeight: '100vh', background: '#FFF8ED', padding: '16px 20px', fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 16 },
   ribbon:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
   brand:     { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
-  navActive: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
+  navActive: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #188159', paddingBottom: 2 },
   navMuted:  { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
   userTag:   { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
   logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },

@@ -90,7 +90,7 @@ function OnboardingPage() {
         {/* Progress bar */}
         <div style={{ display: 'flex', gap: '6px', margin: '20px 0 28px' }}>
           {[1, 2, 3].map(i => (
-            <div key={i} style={{ flex: 1, height: '5px', borderRadius: '4px', background: i <= step ? '#1FA873' : '#F0E9DA' }} />
+            <div key={i} style={{ flex: 1, height: '5px', borderRadius: '4px', background: i <= step ? '#188159' : '#F0E9DA' }} />
           ))}
         </div>
 
