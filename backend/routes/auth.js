@@ -150,6 +150,39 @@ router.post("/login", async (req, res) => {
   }
 });
 
+// ---------- POST /api/resend-verification ----------
+// Generates a fresh token and re-sends the verification email.
+// Always returns 200 so we don't reveal whether an email is registered.
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const db = getDB();
+    const users = db.collection("users");
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await users.findOne({ email: normalizedEmail });
+
+    if (user && !user.isVerified) {
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      await users.updateOne(
+        { _id: user._id },
+        { $set: { verificationToken } }
+      );
+      await sendVerificationEmail(normalizedEmail, verificationToken);
+    }
+
+    return res.status(200).json({
+      message: "If that email exists and is unverified, a new link has been sent.",
+    });
+  } catch (err) {
+    console.error("Resend verification error:", err);
+    return res.status(500).json({ error: "Server error resending verification email" });
+  }
+});
+
 // ---------- POST /api/forgot-password ----------
 router.post("/forgot-password", async (req, res) => {
   try {

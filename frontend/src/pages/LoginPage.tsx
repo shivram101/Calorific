@@ -3,24 +3,40 @@
 // login() handles storing the JWT automatically.
 
 import { useState } from 'react';
-import { login, getProfile } from '../api/client';
+import { login, getProfile, resendVerification } from '../api/client';
 
 function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   async function handleLogin(e: any) {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
+    setResendStatus('idle');
     try {
       await login(email, password);
-      // First-time users haven't completed onboarding yet (goal is null
-      // until the onboarding form saves it) — send them there first.
       const profile = await getProfile();
       window.location.href = profile.goal ? '/Dashboard' : '/onboarding';
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      const msg = err.message || 'Login failed';
+      setError(msg);
+      if (msg.includes('verify your email')) {
+        setNeedsVerification(true);
+      }
+    }
+  }
+
+  async function handleResend() {
+    setResendStatus('sending');
+    try {
+      await resendVerification(email);
+      setResendStatus('sent');
+    } catch {
+      setResendStatus('idle');
     }
   }
 
@@ -40,6 +56,18 @@ function LoginPage() {
         {error && (
           <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
             {error}
+            {needsVerification && (
+              <div style={{ marginTop: 8 }}>
+                {resendStatus === 'sent' ? (
+                  <span style={{ color: '#188159', fontWeight: 600 }}>✓ Verification email sent — check your inbox.</span>
+                ) : (
+                  <button onClick={handleResend} disabled={resendStatus === 'sending'}
+                    style={{ background: 'none', border: 'none', color: '#c24337', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 13 }}>
+                    {resendStatus === 'sending' ? 'Sending...' : 'Resend verification email'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 

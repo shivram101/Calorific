@@ -128,6 +128,10 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
   return request<{ message: string }>('GET', `/verify-email/${token}`, { auth: false });
 }
 
+export async function resendVerification(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>('POST', '/resend-verification', { auth: false, body: { email } });
+}
+
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   return request<{ message: string }>('POST', '/forgot-password', {
     auth: false,
@@ -196,21 +200,23 @@ export async function searchFoods(query: string): Promise<Food[]> {
   return request<Food[]>('GET', `/foods/search?q=${encodeURIComponent(query)}`);
 }
 
+export async function createCustomFood(data: {
+  name: string;
+  calories: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  servingSize?: number;
+  servingSizeUnit?: string;
+}): Promise<Food> {
+  return request<Food>('POST', '/foods/custom', { body: data });
+}
+
 export async function getFoodDetail(id: string): Promise<Food> {
   return request<Food>('GET', `/foods/${id}`);
 }
 
-export async function createCustomFood(food: {
-  name: string;
-  servingSize?: number;
-  servingSizeUnit?: string;
-  calories: number;
-  protein?: number;
-  fat?: number;
-  carbs?: number;
-}): Promise<Food> {
-  return request<Food>('POST', '/foods/custom', { body: food });
-}
+
 
 // ─── Micronutrients ───────────────────────────────────────────────────────────
 

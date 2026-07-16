@@ -49,7 +49,17 @@ router.get("/foods/search", requireAuth, async (req, res) => {
       .find({ source: "fdc", fdcId: { $in: fdcIds } })
       .toArray();
 
-    return res.status(200).json(cachedResults);
+    // Also search local custom (user-submitted) foods by name so users can
+    // find foods they created — FDC will never return these.
+    const customResults = await foods
+      .find({
+        source: "user-submitted",
+        name: { $regex: query.trim(), $options: "i" },
+      })
+      .toArray();
+
+    // Custom foods first so they appear at the top of results
+    return res.status(200).json([...customResults, ...cachedResults]);
   } catch (err) {
     console.error("Food search error:", err);
     return res.status(500).json({ error: "Server error searching foods" });
