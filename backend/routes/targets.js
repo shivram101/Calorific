@@ -13,6 +13,45 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
+// ---------- Mifflin-St Jeor TDEE calculator ----------
+function calculateSuggestedTargets(profile) {
+  const { heightCm, weightKg, age, sex, activityLevel, goal } = profile;
+
+  if (!heightCm || !weightKg || !age || !sex || !activityLevel || !goal) {
+    return null; // incomplete biometrics, can't calculate
+  }
+
+  // Mifflin-St Jeor BMR
+  const bmr =
+    sex === "male"
+      ? 10 * weightKg + 6.25 * heightCm - 5 * age + 5
+      : 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+
+  const activityMultipliers = {
+    sedentary: 1.2,
+    light: 1.375,
+    moderate: 1.55,
+    active: 1.725,
+    veryActive: 1.9,
+  };
+
+  const goalAdjustments = {
+    lose: -500,
+    maintain: 0,
+    gain: 300,
+  };
+
+  const tdee = bmr * (activityMultipliers[activityLevel] ?? 1.2);
+  const calorieTarget = Math.round(tdee + (goalAdjustments[goal] ?? 0));
+
+  // Macro splits: 25% protein, 45% carbs, 30% fat
+  const proteinTarget = Math.round((calorieTarget * 0.25) / 4); // 4 cal/g
+  const carbTarget    = Math.round((calorieTarget * 0.45) / 4); // 4 cal/g
+  const fatTarget     = Math.round((calorieTarget * 0.30) / 9); // 9 cal/g
+
+  return { calorieTarget, proteinTarget, carbTarget, fatTarget };
+}
+
 function todayDateString() {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 }
@@ -27,6 +66,43 @@ function parseRange(rangeParam, fallbackDays = 30) {
   const days = parseInt(rangeParam, 10);
   return Number.isFinite(days) && days > 0 ? days : fallbackDays;
 }
+
+// ---------- GET /api/targets/suggested ----------
+// Returns auto-calculated targets derived from the user's biometrics and goal.
+// The frontend calls this after the user picks a goal so it can preview the
+// recommended values before the user confirms and saves via PUT /api/targets.
+// MUST be defined before /targets or Express will never reach this route.
+router.get("/targets/suggested", requireAuth, async (req, res) => {
+  try {
+    const { ObjectId } = require("mongodb");
+    const db = getDB();
+
+    const user = await db.collection("users").findOne(
+      { _id: new ObjectId(req.userId) },
+      { projection: { heightCm: 1, weightKg: 1, age: 1, sex: 1, activityLevel: 1, goal: 1 } }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const suggested = calculateSuggestedTargets(user);
+
+    if (!suggested) {
+      return res.status(422).json({
+        error: "Incomplete biometrics — please complete onboarding before requesting suggested targets",
+        missing: ["heightCm", "weightKg", "age", "sex", "activityLevel", "goal"].filter(
+          (f) => !user[f]
+        ),
+      });
+    }
+
+    return res.status(200).json(suggested);
+  } catch (err) {
+    console.error("Suggested targets error:", err);
+    return res.status(500).json({ error: "Server error calculating suggested targets" });
+  }
+});
 
 // ---------- GET /api/targets ----------
 router.get("/targets", requireAuth, async (req, res) => {
