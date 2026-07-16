@@ -1,20 +1,16 @@
 // src/pages/GoalsPage.tsx
-// FIX: Original saved goals to localStorage only.
-// Now syncs with GET/PUT /api/targets so goals persist across devices
-// and are available to the backend for progress calculations.
-// Falls back to localStorage defaults if API returns null (targets not set yet).
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTargets, setTargets, getSuggestedTargets, updateProfile, getProfile, getStoredFirstName } from '../api/client';
+import {
+  getTargets, setTargets, getSuggestedTargets, updateProfile,
+  getProfile, getStoredFirstName, getWater, getProgressSummary, todayString,
+} from '../api/client';
 
 type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
 
 export interface Goals {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
+  calories: number; protein: number; carbs: number; fat: number;
 }
 
 const DEFAULTS: Record<GoalType, Goals> = {
@@ -24,7 +20,6 @@ const DEFAULTS: Record<GoalType, Goals> = {
   gain:     { calories: 2700, protein: 169, carbs: 338, fat: 75 },
 };
 
-// Still used by DashboardPage as a local fallback
 export function loadGoals(): Goals {
   try {
     const saved = localStorage.getItem('calorific_goals');
@@ -35,87 +30,93 @@ export function loadGoals(): Goals {
 
 function GoalsPage() {
   const navigate = useNavigate();
-  const [goalType, setGoalType] = useState<GoalType>('maintain');
-  const [goals, setGoals] = useState<Goals>(DEFAULTS.maintain);
-  const [saved, setSaved] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [goalType, setGoalType]   = useState<GoalType>('maintain');
+  const [goals, setGoals]         = useState<Goals>(DEFAULTS.maintain);
+  const [saved, setSaved]         = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
   const [suggestedLoading, setSuggestedLoading] = useState(false);
 
-  // On mount: read the user's profile goal (to set the active button) and always
-  // recalculate targets from biometrics so the value stays current with their goal.
-  // Falls back to saved targets if biometrics are incomplete, then defaults.
+  // Water goal
+  const [waterTarget, setWaterTarget] = useState<number>(
+    () => Number(localStorage.getItem('calorific_water_target')) || 2000
+  );
+  const [waterTodayMl, setWaterTodayMl] = useState(0);
+  const [waterInput, setWaterInput]     = useState('');
+
+  // Streak
+  const [streak, setStreak]           = useState(0);
+  const [recentDays, setRecentDays]   = useState<{ date: string; logged: boolean }[]>([]);
+
   useEffect(() => {
     async function loadAll() {
       try {
         const profile = await getProfile();
+        if (profile.goal) setGoalType(profile.goal as GoalType);
 
-        // Set the active goal button from the user's profile
-        if (profile.goal) {
-          setGoalType(profile.goal as GoalType);
-        }
-
-        // Always recalculate from biometrics — this respects the current profile goal
-        // so switching from gain→maintain always shows the right number on load
         try {
           const suggested = await getSuggestedTargets();
-          const g: Goals = {
-            calories: suggested.calorieTarget,
-            protein: suggested.proteinTarget,
-            carbs: suggested.carbTarget,
-            fat: suggested.fatTarget,
-          };
+          const g: Goals = { calories: suggested.calorieTarget, protein: suggested.proteinTarget, carbs: suggested.carbTarget, fat: suggested.fatTarget };
           setGoals(g);
           localStorage.setItem('calorific_goals', JSON.stringify(g));
         } catch {
-          // Biometrics incomplete — fall back to manually saved targets, then defaults
           const targets = await getTargets().catch(() => null);
-          if (targets) {
-            setGoals({
-              calories: targets.calorieTarget,
-              protein: targets.proteinTarget,
-              carbs: targets.carbTarget,
-              fat: targets.fatTarget,
-            });
-          } else {
-            setGoals(DEFAULTS[(profile.goal as GoalType) ?? 'maintain']);
-          }
+          if (targets) setGoals({ calories: targets.calorieTarget, protein: targets.proteinTarget, carbs: targets.carbTarget, fat: targets.fatTarget });
+          else setGoals(DEFAULTS[(profile.goal as GoalType) ?? 'maintain']);
         }
-      } catch {
-        // Not logged in or server error — fall back to localStorage
-      } finally {
-        setLoading(false);
-      }
+
+        // Water today
+        try {
+          const water = await getWater(todayString());
+          setWaterTodayMl(water.totalMl);
+        } catch {}
+
+        // Streak — look at last 90 days of logs
+        try {
+          const summary = await getProgressSummary(90);
+          const byDate: Record<string, number> = {};
+          summary.summary.forEach((d: any) => { byDate[d.date] = d.calories; });
+
+          const today = new Date();
+          let streakCount = 0;
+          const recent: { date: string; logged: boolean }[] = [];
+
+          for (let i = 0; i < 90; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const dateStr = d.toLocaleDateString('en-CA');
+            const logged = (byDate[dateStr] ?? 0) > 0;
+
+            if (i < 14) recent.push({ date: dateStr, logged });
+
+            // Don't break streak for today if not yet logged
+            if (i === 0 && !logged) continue;
+            if (logged) streakCount++;
+            else break;
+          }
+
+          setStreak(streakCount);
+          setRecentDays(recent.reverse()); // oldest first for display
+        } catch {}
+
+      } catch { /* fall back to localStorage */ }
+      finally { setLoading(false); }
     }
     loadAll();
   }, []);
 
   async function applyPreset(type: GoalType) {
-    setGoalType(type);
-    setSaved(false);
-    setError('');
-    setSuggestedLoading(true);
+    setGoalType(type); setSaved(false); setError(''); setSuggestedLoading(true);
     try {
-      // Save the goal to the user's profile so the backend can calculate from biometrics
       await updateProfile({ goal: type });
-      // Fetch targets calculated from their actual height, weight, age, sex, activity level
       const suggested = await getSuggestedTargets();
-      const g: Goals = {
-        calories: suggested.calorieTarget,
-        protein: suggested.proteinTarget,
-        carbs: suggested.carbTarget,
-        fat: suggested.fatTarget,
-      };
+      const g: Goals = { calories: suggested.calorieTarget, protein: suggested.proteinTarget, carbs: suggested.carbTarget, fat: suggested.fatTarget };
       setGoals(g);
     } catch (err: any) {
-      // Fall back to hardcoded defaults if biometrics are incomplete
       setGoals(DEFAULTS[type]);
-      if (err.message?.includes('Incomplete biometrics')) {
+      if (err.message?.includes('Incomplete biometrics'))
         setError('Complete your profile in Settings to get personalised targets. Showing estimates for now.');
-      }
-    } finally {
-      setSuggestedLoading(false);
-    }
+    } finally { setSuggestedLoading(false); }
   }
 
   function setField(field: keyof Goals, val: string) {
@@ -126,123 +127,233 @@ function GoalsPage() {
   async function handleSave() {
     setError('');
     try {
-      await setTargets({
-        calorieTarget: goals.calories,
-        proteinTarget: goals.protein,
-        carbTarget: goals.carbs,
-        fatTarget: goals.fat,
-      });
-      // Mirror to localStorage so DashboardPage can read it without an extra API call
+      await setTargets({ calorieTarget: goals.calories, proteinTarget: goals.protein, carbTarget: goals.carbs, fatTarget: goals.fat });
       localStorage.setItem('calorific_goals', JSON.stringify(goals));
       setSaved(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save goals');
-    }
+    } catch (err: any) { setError(err.message || 'Failed to save goals'); }
+  }
+
+  function saveWaterTarget(ml: number) {
+    setWaterTarget(ml);
+    localStorage.setItem('calorific_water_target', String(ml));
+    setWaterInput('');
   }
 
   const totalMacroCals = goals.protein * 4 + goals.carbs * 4 + goals.fat * 9;
-
   function pct(macro: 'protein' | 'carbs' | 'fat') {
     if (totalMacroCals === 0) return 0;
     const cals = macro === 'fat' ? goals.fat * 9 : macro === 'protein' ? goals.protein * 4 : goals.carbs * 4;
     return Math.round((cals / totalMacroCals) * 100);
   }
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#FFF8ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#777167' }}>Loading your goals...</p>
-      </div>
-    );
+  const waterPct = Math.min((waterTodayMl / waterTarget) * 100, 100);
+
+  function streakMessage(s: number) {
+    if (s === 0) return 'Log today to start your streak!';
+    if (s < 3)  return 'Great start — keep going!';
+    if (s < 7)  return 'Building momentum 💪';
+    if (s < 14) return 'One week strong!';
+    if (s < 30) return 'Two weeks and counting 🔥';
+    return 'Incredible consistency! 🏆';
   }
 
+  const GOAL_OPTIONS = [
+    { type: 'lose'     as GoalType, label: 'Lose weight',  sub: '−500 kcal/day',           icon: '🔻' },
+    { type: 'maintain' as GoalType, label: 'Maintain',      sub: 'Keep current weight',      icon: '⚖️' },
+    { type: 'build'    as GoalType, label: 'Build muscle',  sub: '+200 kcal · high protein', icon: '💪' },
+    { type: 'gain'     as GoalType, label: 'Gain weight',   sub: '+400 kcal/day surplus',    icon: '📈' },
+  ];
+
+  const MACROS = [
+    { key: 'protein' as const, label: 'Protein', color: '#DC4C3F', mult: 4 },
+    { key: 'carbs'   as const, label: 'Carbs',   color: '#EF9F27', mult: 4 },
+    { key: 'fat'     as const, label: 'Fat',      color: '#378ADD', mult: 9 },
+  ];
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#FFF8ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#777167' }}>Loading your goals...</p>
+    </div>
+  );
+
   return (
-    <div style={styles.page}>
+    <div style={S.page}>
+
       {/* NAVBAR */}
-      <div style={styles.ribbon}>
+      <div style={S.ribbon}>
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <div style={styles.brand}>Calorific</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/Dashboard')}>Log</div>
-          <div style={styles.ribbonItem}>Goals</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
+          <div style={S.brand}>Calorific</div>
+          <div style={S.navMuted} onClick={() => navigate('/Dashboard')}>Log</div>
+          <div style={S.navActive}>Goals</div>
+          <div style={S.navMuted} onClick={() => navigate('/progress')}>Trends</div>
+          <div style={S.navMuted} onClick={() => navigate('/settings')}>Settings</div>
         </div>
-        <div style={styles.ribbonRight}>
-          <div style={styles.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
-          <button style={styles.logoutBtn} onClick={() => navigate('/login')}>Logout</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={S.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
+          <button style={S.logoutBtn} onClick={() => navigate('/login')}>Logout</button>
+        </div>
+      </div>
+
+      {/* PAGE HEADER */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#2D2A26' }}>Your Goals</h1>
+          <p style={{ margin: '3px 0 0', fontSize: 13, color: '#777167' }}>
+            {suggestedLoading ? '⏳ Calculating personalised targets…' : 'Calculated from your biometrics · adjust manually if needed'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {saved && <span style={{ fontSize: 13, fontWeight: 600, color: '#188159' }}>✓ Saved</span>}
+          <button style={S.saveBtn} onClick={handleSave}>Save goals</button>
         </div>
       </div>
 
       {error && (
-        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
+        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: 12, padding: '10px 14px', fontSize: 13 }}>
           {error}
         </div>
       )}
 
-      {/* GOAL TYPE */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Your goal</h2>
-        <p style={styles.cardSub}>Pick a goal and we'll suggest targets, or set them manually below.</p>
-        <div style={styles.goalRow}>
-          {([
-            { type: 'lose',     label: 'Lose weight',  sub: '−500 kcal deficit',      icon: '🔻' },
-            { type: 'maintain', label: 'Maintain',      sub: 'Keep current weight',     icon: '⚖️' },
-            { type: 'build',    label: 'Build muscle',  sub: '+200 kcal, high protein', icon: '💪' },
-            { type: 'gain',     label: 'Gain weight',   sub: '+400 kcal surplus',       icon: '📈' },
-          ] as { type: GoalType; label: string; sub: string; icon: string }[]).map(({ type, label, sub, icon }) => (
-            <button key={type}
-              style={goalType === type ? styles.goalBtnActive : styles.goalBtn}
-              onClick={() => applyPreset(type)} disabled={suggestedLoading}>
-              <span style={{ fontSize: 18 }}>{icon}</span>
-              <span style={{ display: 'block', fontWeight: 700 }}>{label}</span>
-              <span style={{ display: 'block', fontSize: 11, opacity: 0.75, marginTop: 2 }}>{sub}</span>
-            </button>
-          ))}
-        </div>
-        {suggestedLoading && (
-          <p style={{ fontSize: 13, color: '#188159', marginTop: 12 }}>Calculating your targets...</p>
-        )}
-      </div>
+      {/* TOP ROW — Goal selector + Calorie & Macros */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, alignItems: 'start' }}>
 
-      {/* CALORIE TARGET */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Daily calorie target</h2>
-        <div style={styles.bigInputRow}>
-          <input type="number" aria-label="Daily calorie target" value={goals.calories} onChange={e => setField('calories', e.target.value)} style={styles.bigInput} />
-          <span style={styles.bigUnit}>kcal / day</span>
+        {/* Goal selector */}
+        <div style={S.card}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26' }}>Goal</div>
+            <div style={{ fontSize: 12, color: '#777167', marginTop: 2 }}>What are you working toward?</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            {GOAL_OPTIONS.map(({ type, label, sub, icon }) => (
+              <button key={type} onClick={() => applyPreset(type)} disabled={suggestedLoading}
+                style={{ padding: '14px 10px', borderRadius: 12, border: `2px solid ${goalType === type ? '#1FA873' : '#E8E4DC'}`,
+                  background: goalType === type ? '#F0FBF6' : '#FAFAFA', cursor: 'pointer', textAlign: 'center' as const }}>
+                <span style={{ fontSize: 22, display: 'block', marginBottom: 6 }}>{icon}</span>
+                <span style={{ display: 'block', fontWeight: 700, fontSize: 13, color: goalType === type ? '#188159' : '#2D2A26' }}>{label}</span>
+                <span style={{ display: 'block', fontSize: 11, color: goalType === type ? '#1FA873' : '#aaa', marginTop: 3 }}>{sub}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* MACRO TARGETS */}
-      <div style={styles.card}>
-        <h2 style={styles.cardTitle}>Macro targets</h2>
-        <p style={styles.cardSub}>Set daily targets in grams.</p>
-        <div style={styles.macroGrid}>
-          {[
-            { key: 'protein' as const, label: 'Protein', color: '#DC4C3F', mult: 4 },
-            { key: 'carbs' as const, label: 'Carbohydrates', color: '#EF9F27', mult: 4 },
-            { key: 'fat' as const, label: 'Fat', color: '#378ADD', mult: 9 },
-          ].map(({ key, label, color, mult }) => (
-            <div key={key} style={styles.macroCard}>
-              <div style={{ ...styles.macroBar, background: color }} />
-              <div style={styles.macroCardInner}>
-                <div style={styles.macroCardLabel}>{label}</div>
-                <div style={styles.macroCardPct}>{pct(key)}%</div>
-                <div style={styles.macroInputRow}>
-                  <input type="number" aria-label={`${label} target in grams`} value={goals[key]} onChange={e => setField(key, e.target.value)}
-                    style={{ ...styles.macroInput, borderColor: color }} />
-                  <span style={styles.macroUnit}>g</span>
+        {/* Calorie + Macros */}
+        <div style={S.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f0ede8' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26' }}>Daily calorie target</div>
+              <div style={{ fontSize: 12, color: '#777167', marginTop: 2 }}>Total energy per day</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <input type="number" aria-label="Daily calorie target" value={goals.calories}
+                onChange={e => setField('calories', e.target.value)}
+                style={{ fontSize: 30, fontWeight: 800, color: '#2D2A26', background: '#FFF8ED', border: 'none', borderRadius: 10, padding: '6px 12px', width: 120, textAlign: 'center' as const }} />
+              <span style={{ fontSize: 13, color: '#777167', fontWeight: 600 }}>kcal</span>
+            </div>
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#2D2A26', marginBottom: 12 }}>Macro targets</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            {MACROS.map(({ key, label, color, mult }) => (
+              <div key={key} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid #F0EDE8' }}>
+                <div style={{ height: 5, background: color }} />
+                <div style={{ padding: '10px 12px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#2D2A26', marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#2D2A26' }}>{pct(key)}%</div>
+                  <div style={{ background: '#F0EDE8', borderRadius: 4, height: 4, overflow: 'hidden', margin: '6px 0 8px' }}>
+                    <div style={{ height: '100%', width: `${pct(key)}%`, background: color, borderRadius: 4 }} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input type="number" aria-label={`${label} target`} value={goals[key]}
+                      onChange={e => setField(key, e.target.value)}
+                      style={{ width: '100%', padding: '5px 8px', borderRadius: 8, border: `2px solid ${color}`, background: '#FFF8ED', fontSize: 13, fontWeight: 600, color: '#2D2A26', minWidth: 0 }} />
+                    <span style={{ fontSize: 12, color: '#777167' }}>g</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>{goals[key] * mult} kcal</div>
                 </div>
-                <div style={styles.macroCals}>{goals[key] * mult} kcal</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* BOTTOM ROW — Water goal + Streak */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+
+        {/* Water goal */}
+        <div style={S.card}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            {/* Glass fill visual */}
+            <div style={{ position: 'relative', width: 52, height: 72, flexShrink: 0 }}>
+              <div style={{ position: 'absolute', inset: 0, border: '3px solid #2e74ba', borderRadius: '4px 4px 10px 10px', overflow: 'hidden', background: '#f0f6ff' }}>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${waterPct}%`, background: 'linear-gradient(180deg,#5ba4e5 0%,#2e74ba 100%)', transition: 'height 0.5s ease' }} />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 14 }}>
-        {saved && <span style={styles.savedTag}>✓ Saved</span>}
-        <button style={styles.saveBtn} onClick={handleSave}>Save goals</button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26', marginBottom: 2 }}>💧 Daily water goal</div>
+              <div style={{ fontSize: 12, color: '#2e74ba', fontWeight: 600, marginBottom: 10 }}>
+                {waterTodayMl} <span style={{ color: '#777167', fontWeight: 400 }}>/ {waterTarget} ml today</span>
+              </div>
+
+              {/* Quick presets */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                {[1500, 2000, 2500, 3000].map(ml => (
+                  <button key={ml} onClick={() => saveWaterTarget(ml)}
+                    style={{ flex: 1, padding: '6px 0', fontSize: 11, fontWeight: 600, borderRadius: 8, cursor: 'pointer',
+                      background: waterTarget === ml ? '#2e74ba' : '#EBF3FB',
+                      color: waterTarget === ml ? '#fff' : '#2e74ba',
+                      border: `1px solid ${waterTarget === ml ? '#2e74ba' : '#c5ddf5'}` }}>
+                    {ml >= 1000 ? `${ml / 1000}L` : `${ml}`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom input */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" placeholder="Custom ml..." value={waterInput}
+                  onChange={e => setWaterInput(e.target.value)}
+                  style={{ flex: 1, padding: '7px 10px', borderRadius: 9, border: '1px solid #c5ddf5', background: '#f0f6ff', fontSize: 13 }} />
+                <button onClick={() => { const v = Number(waterInput); if (v > 0) saveWaterTarget(v); }}
+                  style={{ padding: '7px 14px', background: '#2e74ba', color: '#fff', border: 'none', borderRadius: 9, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                  Set
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Streak */}
+        <div style={S.card}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26', marginBottom: 2 }}>🔥 Logging streak</div>
+              <div style={{ fontSize: 12, color: '#777167' }}>{streakMessage(streak)}</div>
+            </div>
+            <div style={{ textAlign: 'right' as const }}>
+              <div style={{ fontSize: 42, fontWeight: 900, color: streak > 0 ? '#f97316' : '#ccc', lineHeight: 1 }}>{streak}</div>
+              <div style={{ fontSize: 11, color: '#777167', fontWeight: 600 }}>days in a row</div>
+            </div>
+          </div>
+
+          {/* Last 14 days mini heatmap */}
+          <div style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>Last 14 days</div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              {recentDays.map(({ date, logged }) => (
+                <div key={date} title={date}
+                  style={{ flex: 1, height: 28, borderRadius: 6, background: logged ? '#1FA873' : '#F0EDE8', transition: 'background 0.2s' }} />
+              ))}
+              {/* Fill remaining slots if fewer than 14 days of data */}
+              {Array.from({ length: Math.max(0, 14 - recentDays.length) }).map((_, i) => (
+                <div key={`empty-${i}`} style={{ flex: 1, height: 28, borderRadius: 6, background: '#F0EDE8' }} />
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: '#bbb' }}>14 days ago</span>
+              <span style={{ fontSize: 10, color: '#bbb' }}>Today</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   );
@@ -250,34 +361,14 @@ function GoalsPage() {
 
 export default GoalsPage;
 
-const styles: any = {
-  page: { minHeight: '100vh', background: '#FFF8ED', padding: 20, fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 15 },
-  ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
-  brand: { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
-  ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
-  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
-  ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
+const S: any = {
+  page:      { minHeight: '100vh', background: '#FFF8ED', padding: '16px 20px', fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 16 },
+  ribbon:    { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
+  brand:     { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
+  navActive: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
+  navMuted:  { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
+  userTag:   { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
   logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
-  card: { background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
-  cardTitle: { margin: '0 0 4px 0', fontSize: 17, fontWeight: 700, color: '#2D2A26' },
-  cardSub: { margin: '0 0 18px 0', fontSize: 13, color: '#777167' },
-  goalRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  goalBtn: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #E8E4DC', background: '#FAFAFA', fontSize: 14, fontWeight: 600, color: '#777167', cursor: 'pointer' },
-  goalBtnActive: { flex: 1, minWidth: 140, padding: '14px 10px', borderRadius: 12, border: '2px solid #1FA873', background: '#F0FBF6', fontSize: 14, fontWeight: 700, color: '#188159', cursor: 'pointer' },
-  bigInputRow: { display: 'flex', alignItems: 'center', gap: 14 },
-  bigInput: { fontSize: 36, fontWeight: 700, color: '#2D2A26', background: '#FFF8ED', border: 'none', borderRadius: 12, padding: '10px 18px', width: 180, textAlign: 'center' as const },
-  bigUnit: { fontSize: 16, color: '#777167', fontWeight: 600 },
-  macroGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 },
-  macroCard: { borderRadius: 12, overflow: 'hidden', border: '1px solid #F0EDE8' },
-  macroBar: { height: 6 },
-  macroCardInner: { padding: '14px 16px' },
-  macroCardLabel: { fontSize: 13, fontWeight: 700, color: '#2D2A26', marginBottom: 2 },
-  macroCardPct: { fontSize: 22, fontWeight: 700, color: '#2D2A26', margin: '8px 0' },
-  macroInputRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
-  macroInput: { width: '100%', padding: '8px 10px', borderRadius: 8, border: '2px solid', background: '#FFF8ED', fontSize: 16, fontWeight: 600, color: '#2D2A26' },
-  macroUnit: { fontSize: 14, color: '#777167', fontWeight: 600, whiteSpace: 'nowrap' as const },
-  macroCals: { fontSize: 12, color: '#777167' },
-  saveBtn: { background: '#188159', color: '#fff', border: 'none', borderRadius: 12, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' },
-  savedTag: { fontSize: 14, fontWeight: 600, color: '#188159' },
+  card:      { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
+  saveBtn:   { background: '#188159', color: '#fff', border: 'none', borderRadius: 12, padding: '10px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 16px rgba(31,168,115,0.3)' },
 };
