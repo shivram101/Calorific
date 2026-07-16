@@ -3,24 +3,48 @@
 // Backend field names: heightCm, weightKg, age (number), goal is lowercase 'lose'|'maintain'|'gain'.
 
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getProfile, updateProfile, deleteAccount, logout } from '../api/client';
 
-type GoalType = 'lose' | 'maintain' | 'gain';
+type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
+type UnitSystem = 'metric' | 'us';
 
-const GOAL_OPTIONS: { value: GoalType; label: string; icon: string }[] = [
-  { value: 'lose', label: 'Lose', icon: 'ti-trending-down' },
-  { value: 'maintain', label: 'Maintain', icon: 'ti-scale' },
-  { value: 'gain', label: 'Gain', icon: 'ti-trending-up' },
+const GOAL_OPTIONS: { value: GoalType; label: string; sub: string; icon: string }[] = [
+  { value: 'lose',     label: 'Lose weight',   sub: '−500 kcal/day deficit',      icon: '🔻' },
+  { value: 'maintain', label: 'Maintain',       sub: 'Keep current weight',         icon: '⚖️' },
+  { value: 'build',    label: 'Build muscle',   sub: '+200 kcal, high protein',     icon: '💪' },
+  { value: 'gain',     label: 'Gain weight',    sub: '+400 kcal/day surplus',       icon: '📈' },
 ];
 
+const KG_TO_LBS = 2.20462;
+const CM_PER_INCH = 2.54;
+
+function cmToFtIn(cm: number) {
+  const totalIn = cm / CM_PER_INCH;
+  return { ft: Math.floor(totalIn / 12), inch: Math.round(totalIn % 12) };
+}
+function ftInToCm(ft: number, inch: number) {
+  return Math.round((ft * 12 + inch) * CM_PER_INCH);
+}
+function kgToLbs(kg: number) { return Math.round(kg * KG_TO_LBS * 10) / 10; }
+function lbsToKg(lbs: number) { return Math.round((lbs / KG_TO_LBS) * 10) / 10; }
+
 function SettingsPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [isVerified, setIsVerified] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [age, setAge] = useState('');
-  const [height, setHeight] = useState('');
-  const [weight, setWeight] = useState('');
+  const [heightCmRaw, setHeightCmRaw] = useState('');   // always cm internally
+  const [weightKgRaw, setWeightKgRaw] = useState('');   // always kg internally
+  // Display fields — change with unit system
+  const [heightFt, setHeightFt] = useState('');
+  const [heightIn, setHeightIn] = useState('');
+  const [weightDisplay, setWeightDisplay] = useState('');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>(
+    () => (localStorage.getItem('calorific_units') as UnitSystem) || 'us'
+  );
   const [activityLevel, setActivityLevel] = useState('');
   const [goal, setGoal] = useState<GoalType | ''>('');
   const [loading, setLoading] = useState(true);
@@ -37,32 +61,69 @@ function SettingsPage() {
         setFirstName(data.firstName || '');
         setLastName(data.lastName || '');
         setAge(data.age != null ? String(data.age) : '');
-        setHeight(data.heightCm != null ? String(data.heightCm) : '');
-        setWeight(data.weightKg != null ? String(data.weightKg) : '');
         setActivityLevel(data.activityLevel || '');
         setGoal((data.goal as GoalType) || '');
+
+        const cm = data.heightCm ?? 0;
+        const kg = data.weightKg ?? 0;
+        setHeightCmRaw(cm ? String(cm) : '');
+        setWeightKgRaw(kg ? String(kg) : '');
+
+        if (unitSystem === 'us') {
+          if (cm) { const { ft, inch } = cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); }
+          if (kg) setWeightDisplay(String(kgToLbs(kg)));
+        } else {
+          if (cm) setHeightFt(String(cm));
+          if (kg) setWeightDisplay(String(kg));
+        }
       })
       .catch((err: any) => {
-        if (err.message?.includes('Invalid or expired token')) {
-          logout(); // clears token and redirects to /login
-        } else {
-          setError('Could not load profile.');
-        }
+        if (err.message?.includes('Invalid or expired token')) logout();
+        else setError('Could not load profile.');
       })
       .finally(() => setLoading(false));
   }, []);
+
+  function switchUnitSystem(u: UnitSystem) {
+    setUnitSystem(u);
+    localStorage.setItem('calorific_units', u);
+    const cm = Number(heightCmRaw);
+    const kg = Number(weightKgRaw);
+    if (u === 'us') {
+      if (cm) { const { ft, inch } = cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); }
+      else { setHeightFt(''); setHeightIn(''); }
+      setWeightDisplay(kg ? String(kgToLbs(kg)) : '');
+    } else {
+      setHeightFt(cm ? String(cm) : '');
+      setHeightIn('');
+      setWeightDisplay(kg ? String(kg) : '');
+    }
+  }
 
   async function handleSave() {
     setSaving(true);
     setMessage('');
     setError('');
     try {
+      // Convert display values back to metric for storage
+      let finalHeightCm: number | null = null;
+      let finalWeightKg: number | null = null;
+      if (unitSystem === 'us') {
+        const ft = Number(heightFt), inch = Number(heightIn || 0);
+        if (ft || inch) { finalHeightCm = ftInToCm(ft, inch); setHeightCmRaw(String(finalHeightCm)); }
+        const lbs = Number(weightDisplay);
+        if (lbs) { finalWeightKg = lbsToKg(lbs); setWeightKgRaw(String(finalWeightKg)); }
+      } else {
+        const cm = Number(heightFt);
+        if (cm) { finalHeightCm = cm; setHeightCmRaw(String(cm)); }
+        const kg = Number(weightDisplay);
+        if (kg) { finalWeightKg = kg; setWeightKgRaw(String(kg)); }
+      }
       await updateProfile({
-        firstName,
-        lastName,
+        firstName, lastName,
         age: age !== '' ? Number(age) : null,
-        heightCm: height !== '' ? Number(height) : null,
-        weightKg: weight !== '' ? Number(weight) : null,
+        heightCm: finalHeightCm,
+        weightKg: finalWeightKg,
         activityLevel: activityLevel || null,
         goal: goal || null,
       });
@@ -138,6 +199,17 @@ function SettingsPage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#FFF8ED', padding: '32px 24px' }}>
+      {/* NAVBAR */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)', marginBottom: 24 }}>
+        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26' }}>Calorific</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>Log</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/goals')}>Goals</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/progress')}>Trends</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 }}>Settings</div>
+        </div>
+        <button style={{ background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13 }} onClick={logout}>Logout</button>
+      </div>
       <div style={{ maxWidth: '520px', margin: '0 auto' }}>
 
         {/* Header */}
@@ -199,14 +271,48 @@ function SettingsPage() {
               <label style={labelStyle} htmlFor="settings-age">Age</label>
               <input id="settings-age" type="number" style={inputStyle} value={age} onChange={e => setAge(e.target.value)} />
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="settings-height">Height (cm)</label>
-              <input id="settings-height" type="number" style={inputStyle} value={height} onChange={e => setHeight(e.target.value)} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="settings-weight">Weight (kg)</label>
-              <input id="settings-weight" type="number" style={inputStyle} value={weight} onChange={e => setWeight(e.target.value)} />
-            </div>
+          </div>
+
+          {/* Unit system toggle */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 14, background: '#FFF8ED', borderRadius: 12, padding: 4 }}>
+            {(['metric', 'us'] as UnitSystem[]).map(u => (
+              <button key={u} onClick={() => switchUnitSystem(u)}
+                style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                  background: unitSystem === u ? '#1FA873' : 'transparent',
+                  color: unitSystem === u ? '#fff' : '#777167' }}>
+                {u === 'us' ? '🇺🇸 US (lbs, ft/in)' : '📏 Metric (kg, cm)'}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+            {unitSystem === 'us' ? (
+              <>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Height (ft)</label>
+                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 5" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Height (in)</label>
+                  <input type="number" style={inputStyle} value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="e.g. 10" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Weight (lbs)</label>
+                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 160" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Height (cm)</label>
+                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 175" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Weight (kg)</label>
+                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 70" />
+                </div>
+              </>
+            )}
           </div>
 
         </div>
@@ -250,11 +356,17 @@ function SettingsPage() {
         {/* Goal */}
         <div style={cardStyle}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Goal</div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {GOAL_OPTIONS.map(({ value, label, icon }) => (
-              <div key={value} style={tileStyle(goal === value)} onClick={() => setGoal(value)}>
-                <i className={`ti ${icon}`} style={{ fontSize: '20px', color: goal === value ? '#fff' : '#2D2A26' }} aria-hidden="true"></i>
-                <div style={tileLabelStyle(goal === value)}>{label}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {GOAL_OPTIONS.map(({ value, label, sub, icon }) => (
+              <div key={value} onClick={() => setGoal(value)}
+                style={{
+                  flex: '1 1 45%', padding: '14px 12px', borderRadius: '14px', cursor: 'pointer',
+                  background: goal === value ? '#1FA873' : '#FFF8ED',
+                  border: goal === value ? '2px solid #1FA873' : '2px solid transparent',
+                }}>
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: goal === value ? '#fff' : '#2D2A26' }}>{label}</div>
+                <div style={{ fontSize: 11, color: goal === value ? 'rgba(255,255,255,0.8)' : '#777167', marginTop: 2 }}>{sub}</div>
               </div>
             ))}
           </div>

@@ -106,7 +106,17 @@ export async function login(email: string, password: string): Promise<LoginResul
   });
   // Store the JWT so all subsequent calls are automatically authenticated
   setToken(result.token);
+  // Store first name so any page can greet the user without an extra API call
+  localStorage.setItem('calorific_user', JSON.stringify({ firstName: result.user.firstName }));
   return result;
+}
+
+export function getStoredFirstName(): string {
+  try {
+    const raw = localStorage.getItem('calorific_user');
+    if (raw) return JSON.parse(raw).firstName || '';
+  } catch {}
+  return '';
 }
 
 export function logout(): void {
@@ -148,7 +158,7 @@ export interface UserProfile {
   weightKg: number | null;
   sex: string | null;
   activityLevel: string | null;
-  goal: 'lose' | 'maintain' | 'gain' | null;
+  goal: 'lose' | 'maintain' | 'build' | 'gain' | null;
   createdAt: string;
 }
 
@@ -202,6 +212,27 @@ export async function createCustomFood(food: {
   return request<Food>('POST', '/foods/custom', { body: food });
 }
 
+// ─── Micronutrients ───────────────────────────────────────────────────────────
+
+export interface MicronutrientEntry {
+  name: string;
+  amount: number;
+  unit: string;
+}
+
+export interface MicronutrientsResult {
+  foodId: string;
+  foodName: string;
+  servingSize: number;
+  servingSizeUnit: string;
+  source: string;
+  micronutrients: Record<string, MicronutrientEntry[]>;
+}
+
+export async function getMicronutrients(foodId: string): Promise<MicronutrientsResult> {
+  return request<MicronutrientsResult>('GET', `/foods/${foodId}/micronutrients`);
+}
+
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -232,9 +263,11 @@ export interface DailyLog {
   };
 }
 
-// Returns today's date as a YYYY-MM-DD string
+// Returns today's date as a YYYY-MM-DD string in the user's LOCAL timezone.
+// toISOString() returns UTC which can be a day behind for US timezones — use
+// toLocaleDateString('en-CA') instead, which gives "YYYY-MM-DD" in local time.
 export function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString('en-CA');
 }
 
 export async function getLogs(date: string): Promise<DailyLog> {
@@ -291,6 +324,15 @@ export interface Targets {
 
 export async function getTargets(): Promise<Targets | null> {
   return request<Targets | null>('GET', '/targets');
+}
+
+export async function getSuggestedTargets(): Promise<{
+  calorieTarget: number;
+  proteinTarget: number;
+  carbTarget: number;
+  fatTarget: number;
+}> {
+  return request('GET', '/targets/suggested');
 }
 
 export async function setTargets(targets: {

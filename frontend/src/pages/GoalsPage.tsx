@@ -6,9 +6,9 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTargets, setTargets } from '../api/client';
+import { getTargets, setTargets, getSuggestedTargets, updateProfile, getProfile, getStoredFirstName } from '../api/client';
 
-type GoalType = 'lose' | 'maintain' | 'gain';
+type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
 
 export interface Goals {
   calories: number;
@@ -18,9 +18,10 @@ export interface Goals {
 }
 
 const DEFAULTS: Record<GoalType, Goals> = {
-  lose:     { calories: 1800, protein: 180, carbs: 135, fat: 60 },
-  maintain: { calories: 2200, protein: 165, carbs: 220, fat: 73 },
-  gain:     { calories: 2700, protein: 200, carbs: 310, fat: 90 },
+  lose:     { calories: 1800, protein: 135, carbs: 180, fat: 60 },
+  maintain: { calories: 2200, protein: 138, carbs: 248, fat: 73 },
+  build:    { calories: 2500, protein: 219, carbs: 250, fat: 69 },
+  gain:     { calories: 2700, protein: 169, carbs: 338, fat: 75 },
 };
 
 // Still used by DashboardPage as a local fallback
@@ -39,32 +40,82 @@ function GoalsPage() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [suggestedLoading, setSuggestedLoading] = useState(false);
 
-  // Load existing targets from API on mount
+  // On mount: read the user's profile goal (to set the active button) and always
+  // recalculate targets from biometrics so the value stays current with their goal.
+  // Falls back to saved targets if biometrics are incomplete, then defaults.
   useEffect(() => {
-    getTargets()
-      .then(targets => {
-        if (targets) {
+    async function loadAll() {
+      try {
+        const profile = await getProfile();
+
+        // Set the active goal button from the user's profile
+        if (profile.goal) {
+          setGoalType(profile.goal as GoalType);
+        }
+
+        // Always recalculate from biometrics — this respects the current profile goal
+        // so switching from gain→maintain always shows the right number on load
+        try {
+          const suggested = await getSuggestedTargets();
           const g: Goals = {
-            calories: targets.calorieTarget,
-            protein: targets.proteinTarget,
-            carbs: targets.carbTarget,
-            fat: targets.fatTarget,
+            calories: suggested.calorieTarget,
+            protein: suggested.proteinTarget,
+            carbs: suggested.carbTarget,
+            fat: suggested.fatTarget,
           };
           setGoals(g);
           localStorage.setItem('calorific_goals', JSON.stringify(g));
+        } catch {
+          // Biometrics incomplete — fall back to manually saved targets, then defaults
+          const targets = await getTargets().catch(() => null);
+          if (targets) {
+            setGoals({
+              calories: targets.calorieTarget,
+              protein: targets.proteinTarget,
+              carbs: targets.carbTarget,
+              fat: targets.fatTarget,
+            });
+          } else {
+            setGoals(DEFAULTS[(profile.goal as GoalType) ?? 'maintain']);
+          }
         }
-      })
-      .catch(() => {
+      } catch {
         // Not logged in or server error — fall back to localStorage
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAll();
   }, []);
 
-  function applyPreset(type: GoalType) {
+  async function applyPreset(type: GoalType) {
     setGoalType(type);
-    setGoals(DEFAULTS[type]);
     setSaved(false);
+    setError('');
+    setSuggestedLoading(true);
+    try {
+      // Save the goal to the user's profile so the backend can calculate from biometrics
+      await updateProfile({ goal: type });
+      // Fetch targets calculated from their actual height, weight, age, sex, activity level
+      const suggested = await getSuggestedTargets();
+      const g: Goals = {
+        calories: suggested.calorieTarget,
+        protein: suggested.proteinTarget,
+        carbs: suggested.carbTarget,
+        fat: suggested.fatTarget,
+      };
+      setGoals(g);
+    } catch (err: any) {
+      // Fall back to hardcoded defaults if biometrics are incomplete
+      setGoals(DEFAULTS[type]);
+      if (err.message?.includes('Incomplete biometrics')) {
+        setError('Complete your profile in Settings to get personalised targets. Showing estimates for now.');
+      }
+    } finally {
+      setSuggestedLoading(false);
+    }
   }
 
   function setField(field: keyof Goals, val: string) {
@@ -114,10 +165,10 @@ function GoalsPage() {
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/Dashboard')}>Log</div>
           <div style={styles.ribbonItem}>Goals</div>
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={styles.ribbonItemMuted}>Settings</div>
+          <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
         </div>
         <div style={styles.ribbonRight}>
-          <div style={styles.userTag}>Logged in</div>
+          <div style={styles.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
           <button style={styles.logoutBtn} onClick={() => navigate('/login')}>Logout</button>
         </div>
       </div>
@@ -133,13 +184,24 @@ function GoalsPage() {
         <h2 style={styles.cardTitle}>Your goal</h2>
         <p style={styles.cardSub}>Pick a goal and we'll suggest targets, or set them manually below.</p>
         <div style={styles.goalRow}>
-          {(['lose', 'maintain', 'gain'] as GoalType[]).map(type => (
-            <button key={type} style={goalType === type ? styles.goalBtnActive : styles.goalBtn} onClick={() => applyPreset(type)}>
-              {type === 'lose' && '🔻 '}{type === 'maintain' && '⚖️ '}{type === 'gain' && '📈 '}
-              {type === 'lose' ? 'Lose weight' : type === 'maintain' ? 'Maintain weight' : 'Gain weight'}
+          {([
+            { type: 'lose',     label: 'Lose weight',  sub: '−500 kcal deficit',      icon: '🔻' },
+            { type: 'maintain', label: 'Maintain',      sub: 'Keep current weight',     icon: '⚖️' },
+            { type: 'build',    label: 'Build muscle',  sub: '+200 kcal, high protein', icon: '💪' },
+            { type: 'gain',     label: 'Gain weight',   sub: '+400 kcal surplus',       icon: '📈' },
+          ] as { type: GoalType; label: string; sub: string; icon: string }[]).map(({ type, label, sub, icon }) => (
+            <button key={type}
+              style={goalType === type ? styles.goalBtnActive : styles.goalBtn}
+              onClick={() => applyPreset(type)} disabled={suggestedLoading}>
+              <span style={{ fontSize: 18 }}>{icon}</span>
+              <span style={{ display: 'block', fontWeight: 700 }}>{label}</span>
+              <span style={{ display: 'block', fontSize: 11, opacity: 0.75, marginTop: 2 }}>{sub}</span>
             </button>
           ))}
         </div>
+        {suggestedLoading && (
+          <p style={{ fontSize: 13, color: '#188159', marginTop: 12 }}>Calculating your targets...</p>
+        )}
       </div>
 
       {/* CALORIE TARGET */}

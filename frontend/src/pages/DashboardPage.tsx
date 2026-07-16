@@ -18,9 +18,12 @@ import {
   addWater,
   logout,
   todayString,
+  getMicronutrients,
+  getStoredFirstName,
   type Food,
   type LogEntry,
   type Meal,
+  type MicronutrientsResult,
 } from '../api/client';
 import { loadGoals } from './GoalsPage';
 
@@ -52,11 +55,23 @@ function DashboardPage() {
   const [meal, setMeal] = useState<Meal>('breakfast');
 
   // Water state
+  const WATER_GOAL_ML = 2000;
   const [waterMl, setWaterMl] = useState(0);
   const [waterInput, setWaterInput] = useState('');
+  const [waterAdding, setWaterAdding] = useState(false);
 
   // Error state
   const [error, setError] = useState('');
+
+  // Micronutrients modal state
+  const [microData, setMicroData] = useState<MicronutrientsResult | null>(null);
+  const [microLoading, setMicroLoading] = useState(false);
+  const [microError, setMicroError] = useState('');
+
+  // Daily micronutrients modal state
+  const [dailyMicroData, setDailyMicroData] = useState<Record<string, Record<string, { amount: number; unit: string }>> | null>(null);
+  const [dailyMicroLoading, setDailyMicroLoading] = useState(false);
+  const [dailyMicroError, setDailyMicroError] = useState('');
 
   // Load diary and water for today on mount
   const loadDiary = useCallback(async () => {
@@ -130,18 +145,92 @@ function DashboardPage() {
     }
   }
 
-  // Log water
+  // Fetch and display micronutrients for a food
+  async function handleViewMicronutrients(food: Food) {
+    setMicroData(null);
+    setMicroError('');
+    setMicroLoading(true);
+    try {
+      const data = await getMicronutrients(food._id);
+      setMicroData(data);
+    } catch (err: any) {
+      setMicroError(err.message || 'Failed to load nutrition details');
+      setMicroData({ foodId: food._id, foodName: food.name, servingSize: food.servingSize, servingSizeUnit: food.servingSizeUnit, source: food.source, micronutrients: {} });
+    } finally {
+      setMicroLoading(false);
+    }
+  }
+
+  // Log water — POST only returns the single entry, so re-fetch the daily total after
   async function handleAddWater(e: any) {
     e.preventDefault();
     const amount = Number(waterInput);
     if (!amount || amount <= 0) return;
+    setWaterAdding(true);
     setError('');
     try {
-      const result = await addWater(amount, TODAY);
-      setWaterMl(result.totalMl);
+      await addWater(amount, TODAY);
+      const updated = await getWater(TODAY);
+      setWaterMl(updated.totalMl);
       setWaterInput('');
     } catch (err: any) {
       setError(err.message || 'Failed to log water');
+    } finally {
+      setWaterAdding(false);
+    }
+  }
+
+  async function handleQuickAddWater(amount: number) {
+    setWaterAdding(true);
+    setError('');
+    try {
+      await addWater(amount, TODAY);
+      const updated = await getWater(TODAY);
+      setWaterMl(updated.totalMl);
+    } catch (err: any) {
+      setError(err.message || 'Failed to log water');
+    } finally {
+      setWaterAdding(false);
+    }
+  }
+
+  // Aggregate micronutrients across all foods logged today
+  async function handleViewDailyMicronutrients() {
+    setDailyMicroData(null);
+    setDailyMicroError('');
+    setDailyMicroLoading(true);
+    try {
+      if (entries.length === 0) { setDailyMicroData({}); return; }
+
+      // Sum quantities per unique food (a food may be logged multiple times)
+      const foodQuantities: Record<string, number> = {};
+      entries.forEach(e => { foodQuantities[e.foodId] = (foodQuantities[e.foodId] || 0) + e.quantity; });
+
+      const ids = Object.keys(foodQuantities);
+      const results = await Promise.all(ids.map(id => getMicronutrients(id).catch(() => null)));
+
+      // Aggregate, weighted by quantity logged
+      const agg: Record<string, Record<string, { amount: number; unit: string }>> = {};
+      results.forEach((result, idx) => {
+        if (!result) return;
+        const qty = foodQuantities[ids[idx]];
+        Object.entries(result.micronutrients).forEach(([cat, nutrients]) => {
+          if (!agg[cat]) agg[cat] = {};
+          nutrients.forEach(n => {
+            if (!agg[cat][n.name]) agg[cat][n.name] = { amount: 0, unit: n.unit };
+            agg[cat][n.name].amount += n.amount * qty;
+          });
+        });
+      });
+
+      // Round amounts to 2 decimal places
+      Object.values(agg).forEach(cat => Object.values(cat).forEach(n => { n.amount = Math.round(n.amount * 100) / 100; }));
+      setDailyMicroData(agg);
+    } catch (err: any) {
+      setDailyMicroError(err.message || 'Failed to load micronutrients');
+      setDailyMicroData({});
+    } finally {
+      setDailyMicroLoading(false);
     }
   }
 
@@ -164,7 +253,7 @@ function DashboardPage() {
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
         </div>
         <div style={styles.ribbonRight}>
-          <div style={styles.userTag}>Logged in</div>
+          <div style={styles.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
           <button style={styles.logoutBtn} onClick={logout}>Logout</button>
         </div>
       </div>
@@ -214,9 +303,13 @@ function DashboardPage() {
                 <button type="button" onClick={() => setSelectedFood(null)}
                   style={{ background: 'none', border: 'none', color: '#c24337', cursor: 'pointer', fontSize: 16 }}>✕</button>
               </div>
-              <div style={{ fontSize: 12, color: '#777167', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: '#777167', marginBottom: 6 }}>
                 Per serving: {selectedFood.calories} kcal · {selectedFood.protein}g P · {selectedFood.carbs}g C · {selectedFood.fat}g F
               </div>
+              <button type="button" onClick={() => handleViewMicronutrients(selectedFood)}
+                style={{ background: 'none', border: 'none', color: '#188159', fontSize: 12, cursor: 'pointer', padding: 0, marginBottom: 10, textDecoration: 'underline' }}>
+                View full nutrition details
+              </button>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input type="number" min="0.1" step="0.1" value={quantity} onChange={e => setQuantity(Number(e.target.value))}
                   aria-label="Quantity" style={{ ...styles.input, maxWidth: 80 }} placeholder="Qty" />
@@ -230,38 +323,101 @@ function DashboardPage() {
 
           {/* Water tracker */}
           <div style={{ marginTop: 14, borderTop: '1px solid #eee', paddingTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-              <strong style={{ fontSize: 13 }}>💧 Water today</strong>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#2e74ba' }}>{waterMl} ml</span>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              {/* Water glass fill widget */}
+              <div style={{ position: 'relative', width: 48, height: 64, flexShrink: 0 }}>
+                <div style={{ position: 'absolute', inset: 0, border: '2.5px solid #2e74ba', borderRadius: '4px 4px 8px 8px', overflow: 'hidden', background: '#f0f6ff' }}>
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    height: `${Math.min((waterMl / WATER_GOAL_ML) * 100, 100)}%`,
+                    background: 'linear-gradient(180deg, #5ba4e5 0%, #2e74ba 100%)',
+                    transition: 'height 0.5s ease',
+                  }} />
+                </div>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                  <strong style={{ fontSize: 13 }}>💧 Water today</strong>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#2e74ba' }}>
+                    {waterMl} <span style={{ fontWeight: 400, color: '#777167' }}>/ {WATER_GOAL_ML} ml</span>
+                  </span>
+                </div>
+                {/* Quick add buttons */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {[250, 500, 750].map(amt => (
+                    <button key={amt} type="button" disabled={waterAdding}
+                      onClick={() => handleQuickAddWater(amt)}
+                      style={{ flex: 1, padding: '6px 0', background: '#EBF3FB', color: '#2e74ba', border: '1px solid #c5ddf5', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                      +{amt}ml
+                    </button>
+                  ))}
+                </div>
+                {/* Custom amount input */}
+                <form onSubmit={handleAddWater} style={{ display: 'flex', gap: 8 }}>
+                  <input type="number" aria-label="Water amount in milliliters" placeholder="Custom ml..." value={waterInput}
+                    onChange={e => setWaterInput(e.target.value)} style={{ ...styles.input, flex: 1 }} />
+                  <button type="submit" disabled={waterAdding} style={{ ...styles.addBtn, background: '#2e74ba' }}>
+                    {waterAdding ? '...' : '+ Add'}
+                  </button>
+                </form>
+              </div>
             </div>
-            <form onSubmit={handleAddWater} style={{ display: 'flex', gap: 8 }}>
-              <input type="number" aria-label="Water amount in milliliters" placeholder="ml (e.g. 250)" value={waterInput} onChange={e => setWaterInput(e.target.value)}
-                style={{ ...styles.input, flex: 1 }} />
-              <button type="submit" style={{ ...styles.addBtn, background: '#2e74ba' }}>+ Water</button>
-            </form>
           </div>
         </div>
 
         {/* TODAY SUMMARY */}
         <div style={styles.summaryCol}>
+          {/* Calories card */}
           <div style={styles.summaryCard}>
             <div style={styles.summaryEyebrow}>Today</div>
             <div style={styles.summaryDate}>{today}</div>
-            <div style={styles.summaryCalLabel}>Calories</div>
-            <div style={styles.summaryCalValue}>{totals.calories.toLocaleString()}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 8 }}>
+              <div style={{ fontSize: 36, fontWeight: 800, color: '#2D2A26', lineHeight: 1 }}>
+                {Math.round(totals.calories).toLocaleString()}
+              </div>
+              <div style={{ fontSize: 12, color: '#777167', textAlign: 'right' }}>
+                <div>kcal</div>
+                <div>/ {GOALS.calories} goal</div>
+              </div>
+            </div>
+            <div style={{ background: '#F0EDE8', borderRadius: 6, height: 8, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                width: `${Math.min(GOALS.calories > 0 ? (totals.calories / GOALS.calories) * 100 : 0, 100)}%`,
+                background: totals.calories > GOALS.calories ? '#c24337' : '#1FA873',
+                borderRadius: 6, transition: 'width 0.4s',
+              }} />
+            </div>
           </div>
+
+          {/* Macros card */}
           <div style={styles.macroCard}>
             {[
-              { label: 'Fat', value: totals.fat, color: '#2e74ba' },
-              { label: 'Protein', value: totals.protein, color: '#c24337' },
-              { label: 'Carbs', value: totals.carbs, color: '#9b6719' },
-            ].map(({ label, value, color }) => (
+              { label: 'Fat', value: totals.fat, goal: GOALS.fat, color: '#2e74ba' },
+              { label: 'Protein', value: totals.protein, goal: GOALS.protein, color: '#c24337' },
+              { label: 'Carbs', value: totals.carbs, goal: GOALS.carbs, color: '#9b6719' },
+            ].map(({ label, value, goal, color }) => (
               <div key={label} style={styles.macroItem}>
-                <div style={{ ...styles.macroValue, color }}>{value}g</div>
+                <div style={{ ...styles.macroValue, color }}>{Math.round(value)}g</div>
+                <div style={{ fontSize: 10, color: '#bbb', marginBottom: 4 }}>/ {goal}g</div>
+                <div style={{ background: '#F0EDE8', borderRadius: 4, height: 5, overflow: 'hidden', width: '100%' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${Math.min(goal > 0 ? (value / goal) * 100 : 0, 100)}%`,
+                    background: color, borderRadius: 4,
+                  }} />
+                </div>
                 <div style={styles.macroLabel}>{label}</div>
               </div>
             ))}
           </div>
+
+          {/* Micronutrients button */}
+          <button
+            onClick={handleViewDailyMicronutrients}
+            style={{ width: '100%', padding: '12px', background: '#fff', border: '1.5px solid #1FA873', borderRadius: 12, color: '#188159', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+            🔬 View Today's Micronutrients
+          </button>
         </div>
       </div>
 
@@ -321,6 +477,82 @@ function DashboardPage() {
           <ProgressRing value={totals.fat} max={GOALS.fat} color="#378ADD" label="Fat" unit="g" />
         </div>
       </div>
+      {/* DAILY MICRONUTRIENTS MODAL */}
+      {(dailyMicroLoading || dailyMicroData !== null) && (
+        <div style={styles.modalOverlay} onClick={() => { setDailyMicroData(null); setDailyMicroError(''); }}>
+          <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#2D2A26' }}>Today's Micronutrients</div>
+                <div style={{ fontSize: 12, color: '#777167', marginTop: 2 }}>Aggregated across all foods logged today</div>
+              </div>
+              <button onClick={() => { setDailyMicroData(null); setDailyMicroError(''); }}
+                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#777167' }}>✕</button>
+            </div>
+
+            {dailyMicroError && <p style={{ color: '#c24337', fontSize: 13 }}>{dailyMicroError}</p>}
+            {dailyMicroLoading && <p style={{ color: '#777167', fontSize: 13 }}>Calculating micronutrients...</p>}
+
+            {dailyMicroData && !dailyMicroLoading && (
+              Object.keys(dailyMicroData).length === 0
+                ? <p style={{ color: '#777167', fontSize: 13 }}>No micronutrient data available for today's foods. Try logging more items.</p>
+                : Object.entries(dailyMicroData).map(([category, nutrients]) => (
+                  <div key={category} style={{ marginBottom: 16 }}>
+                    <div style={styles.microCategory}>{category}</div>
+                    {Object.entries(nutrients).map(([name, { amount, unit }]) => (
+                      <div key={name} style={styles.microRow}>
+                        <span style={{ color: '#2D2A26' }}>{name}</span>
+                        <span style={{ fontWeight: 600, color: '#188159' }}>{amount}{unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MICRONUTRIENTS MODAL */}
+      {(microLoading || microData) && (
+        <div style={styles.modalOverlay} onClick={() => { setMicroData(null); setMicroError(''); }}>
+          <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#2D2A26' }}>
+                  {microData?.foodName ?? 'Loading...'}
+                </div>
+                {microData && (
+                  <div style={{ fontSize: 12, color: '#777167', marginTop: 2 }}>
+                    Per {microData.servingSize}{microData.servingSizeUnit} serving
+                  </div>
+                )}
+              </div>
+              <button onClick={() => { setMicroData(null); setMicroError(''); }}
+                style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#777167' }}>✕</button>
+            </div>
+
+            {microLoading && <p style={{ color: '#777167', fontSize: 13 }}>Loading nutrition details...</p>}
+
+            {microError && <p style={{ color: '#c24337', fontSize: 13 }}>{microError}</p>}
+
+            {microData && !microLoading && (
+              Object.keys(microData.micronutrients).length === 0
+                ? <p style={{ color: '#777167', fontSize: 13 }}>No detailed micronutrient data available for this food.</p>
+                : Object.entries(microData.micronutrients).map(([category, nutrients]) => (
+                  <div key={category} style={{ marginBottom: 16 }}>
+                    <div style={styles.microCategory}>{category}</div>
+                    {nutrients.map(n => (
+                      <div key={n.name} style={styles.microRow}>
+                        <span style={{ color: '#2D2A26' }}>{n.name}</span>
+                        <span style={{ fontWeight: 600, color: '#188159' }}>{n.amount}{n.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -387,4 +619,8 @@ const styles: any = {
   ringsRow: { display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 20 },
   ringWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
   ringLabel: { fontSize: 12, fontWeight: 600, color: '#2D2A26' },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  modalBox: { background: '#fff', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' },
+  microCategory: { fontSize: 11, fontWeight: 700, color: '#188159', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 6, paddingBottom: 4, borderBottom: '1px solid #eee' },
+  microRow: { display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderBottom: '1px solid #f9f9f9' },
 };

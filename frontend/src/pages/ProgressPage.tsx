@@ -16,11 +16,20 @@ import {
   getWeightHistory,
   getProgressSummary,
   getTargets,
+  getSuggestedTargets,
   logWeight,
+  getLogs,
+  addLog,
+  deleteLog,
+  searchFoods,
   logout,
   todayString,
+  getStoredFirstName,
   type WeightEntry,
   type DailySummary,
+  type LogEntry,
+  type Meal,
+  type Food,
 } from '../api/client';
 
 const RANGES = [7, 30, 90];
@@ -34,7 +43,7 @@ function sampleData(range: number) {
   for (let i = range - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const date = d.toISOString().slice(0, 10);
+    const date = d.toLocaleDateString('en-CA');
     const drift = (range - i) * (1.2 / range);
     if (i % 2 === 0) {
       weights.push({
@@ -67,6 +76,22 @@ function ProgressPage() {
   const [weightInput, setWeightInput] = useState('');
   const [savingWeight, setSavingWeight] = useState(false);
 
+  // Day editor modal
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [dayLogs, setDayLogs] = useState<LogEntry[]>([]);
+  const [dayTotals, setDayTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [dayLoading, setDayLoading] = useState(false);
+  const [dayError, setDayError] = useState('');
+  const [dayWeightInput, setDayWeightInput] = useState('');
+  const [savingDayWeight, setSavingDayWeight] = useState(false);
+  const [daySearch, setDaySearch] = useState('');
+  const [daySearchResults, setDaySearchResults] = useState<Food[]>([]);
+  const [daySearching, setDaySearching] = useState(false);
+  const [daySelectedFood, setDaySelectedFood] = useState<Food | null>(null);
+  const [dayQuantity, setDayQuantity] = useState(1);
+  const [dayMeal, setDayMeal] = useState<Meal>('breakfast');
+  const [dayAdding, setDayAdding] = useState(false);
+
   // Weight unit preference — backend stores kg; this is display-only.
   // (Onboarding asks kg/lbs but the preference isn't persisted server-side yet
   //  — candidate for the Settings page.)
@@ -89,14 +114,23 @@ function ProgressPage() {
     setLoading(true);
     setError('');
     try {
-      const [w, s, t] = await Promise.all([
+      const [w, s] = await Promise.all([
         getWeightHistory(range),
         getProgressSummary(range),
-        getTargets(),
       ]);
       setWeights(w.entries ?? []);
       setSummary(s.summary ?? []);
-      setCalorieTarget(t?.calorieTarget ?? null);
+
+      // Use the live calculated target so it always reflects the current goal,
+      // not whatever was last manually saved
+      try {
+        const suggested = await getSuggestedTargets();
+        setCalorieTarget(suggested.calorieTarget);
+      } catch {
+        const t = await getTargets().catch(() => null);
+        setCalorieTarget(t?.calorieTarget ?? null);
+      }
+
       setSampleMode(false);
     } catch {
       const demo = sampleData(range);
@@ -110,6 +144,94 @@ function ProgressPage() {
   }, [range]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function openDayEditor(date: string) {
+    setEditingDate(date);
+    setDayLoading(true);
+    setDayError('');
+    setDaySearch('');
+    setDaySearchResults([]);
+    setDaySelectedFood(null);
+    setDayQuantity(1);
+    setDayMeal('breakfast');
+    const existingKg = weightByDate[date];
+    setDayWeightInput(existingKg ? String(disp(existingKg)) : '');
+    try {
+      const log = await getLogs(date);
+      setDayLogs(log.entries);
+      setDayTotals(log.totals);
+    } catch {
+      setDayError('Could not load logs for this day');
+    } finally {
+      setDayLoading(false);
+    }
+  }
+
+  async function handleDayLogWeight(e: React.FormEvent) {
+    e.preventDefault();
+    const entered = Number(dayWeightInput);
+    if (!entered || entered <= 0) return;
+    const kg = unit === 'kg' ? entered : Math.round(entered * KG_PER_LB * 10) / 10;
+    setSavingDayWeight(true);
+    setDayError('');
+    try {
+      await logWeight(kg, editingDate!);
+      await load();
+    } catch {
+      setDayError('Could not save weight');
+    } finally {
+      setSavingDayWeight(false);
+    }
+  }
+
+  async function handleDaySearch(e: React.FormEvent) {
+    e.preventDefault();
+    if (!daySearch.trim()) return;
+    setDaySearching(true);
+    setDayError('');
+    try {
+      const results = await searchFoods(daySearch.trim());
+      setDaySearchResults(results);
+    } catch {
+      setDayError('Search failed');
+    } finally {
+      setDaySearching(false);
+    }
+  }
+
+  async function handleDayAddLog(e: React.FormEvent) {
+    e.preventDefault();
+    if (!daySelectedFood || !editingDate) return;
+    setDayAdding(true);
+    setDayError('');
+    try {
+      await addLog({ foodId: daySelectedFood._id, quantity: dayQuantity, meal: dayMeal, date: editingDate });
+      const log = await getLogs(editingDate);
+      setDayLogs(log.entries);
+      setDayTotals(log.totals);
+      setDaySelectedFood(null);
+      setDaySearchResults([]);
+      setDaySearch('');
+      await load();
+    } catch {
+      setDayError('Could not add food');
+    } finally {
+      setDayAdding(false);
+    }
+  }
+
+  async function handleDayDeleteLog(id: string) {
+    setDayError('');
+    try {
+      await deleteLog(id);
+      const log = await getLogs(editingDate!);
+      setDayLogs(log.entries);
+      setDayTotals(log.totals);
+      await load();
+    } catch {
+      setDayError('Could not delete entry');
+    }
+  }
 
   async function handleLogWeight(e: React.FormEvent) {
     e.preventDefault();
@@ -191,10 +313,10 @@ function ProgressPage() {
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/Dashboard')}>Log</div>
           <div style={styles.ribbonItemMuted} onClick={() => navigate('/goals')}>Goals</div>
           <div style={styles.ribbonItem}>Trends</div>
-          <div style={styles.ribbonItemMuted}>Settings</div>
+          <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
         </div>
         <div style={styles.ribbonRight}>
-          <div style={styles.userTag}>Logged in</div>
+          <div style={styles.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
           <button style={styles.logoutBtn} onClick={handleLogout}>Logout</button>
         </div>
       </div>
@@ -280,7 +402,7 @@ function ProgressPage() {
                       hasWeight={cell in weightByDate}
                       target={calorieTarget}
                       selected={cell === selectedDate}
-                      onSelect={() => setSelectedDate(cell)}
+                      onSelect={() => { setSelectedDate(cell); openDayEditor(cell); }}
                     />
                   ) : (
                     <div key={Math.random()} />
@@ -295,10 +417,10 @@ function ProgressPage() {
                 </div>
                 {selectedDay && selectedDay.calories > 0 ? (
                   <div style={styles.dayDetailStats}>
-                    <span style={{ fontWeight: 700, color: '#2D2A26' }}>{selectedDay.calories.toLocaleString()} kcal</span>
-                    <span style={{ color: '#c24337' }}>{selectedDay.protein}g P</span>
-                    <span style={{ color: '#9b6719' }}>{selectedDay.carbs}g C</span>
-                    <span style={{ color: '#2e74ba' }}>{selectedDay.fat}g F</span>
+                    <span style={{ fontWeight: 700, color: '#2D2A26' }}>{Math.round(selectedDay.calories).toLocaleString()} kcal</span>
+                    <span style={{ color: '#c24337' }}>{Math.round(selectedDay.protein)}g P</span>
+                    <span style={{ color: '#9b6719' }}>{Math.round(selectedDay.carbs)}g C</span>
+                    <span style={{ color: '#2e74ba' }}>{Math.round(selectedDay.fat)}g F</span>
                     {selectedWeight !== undefined && (
                       <span style={{ color: '#777167' }}>{disp(selectedWeight)} {unit}</span>
                     )}
@@ -385,6 +507,140 @@ function ProgressPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ===== DAY EDITOR MODAL ===== */}
+      {editingDate && (
+        <div style={styles.modalOverlay} onClick={() => setEditingDate(null)}>
+          <div style={styles.modalBox} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 17, color: '#2D2A26' }}>
+                  {new Date(editingDate + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                </div>
+                <div style={{ fontSize: 12, color: '#777167', marginTop: 2 }}>Click outside to close</div>
+              </div>
+              <button onClick={() => setEditingDate(null)}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#777167' }}>✕</button>
+            </div>
+
+            {dayError && (
+              <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: 10, padding: '8px 12px', fontSize: 13, marginBottom: 14 }}>
+                {dayError}
+              </div>
+            )}
+
+            {/* Weight section */}
+            <div style={styles.modalSection}>
+              <div style={styles.modalSectionTitle}>⚖️ Weight</div>
+              <form onSubmit={handleDayLogWeight} style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="number" step="0.1"
+                  placeholder={`Weight (${unit})`}
+                  value={dayWeightInput}
+                  onChange={e => setDayWeightInput(e.target.value)}
+                  style={styles.modalInput}
+                />
+                <button type="submit" disabled={savingDayWeight} style={styles.modalBtn}>
+                  {savingDayWeight ? '...' : weightByDate[editingDate] ? 'Update' : 'Log'}
+                </button>
+              </form>
+              {weightByDate[editingDate] && (
+                <div style={{ fontSize: 12, color: '#777167', marginTop: 6 }}>
+                  Current: {disp(weightByDate[editingDate])} {unit}
+                </div>
+              )}
+            </div>
+
+            {/* Food diary section */}
+            <div style={styles.modalSection}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+                <div style={styles.modalSectionTitle}>🍽️ Food diary</div>
+                {dayTotals.calories > 0 && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#188159' }}>
+                    {Math.round(dayTotals.calories)} kcal · {Math.round(dayTotals.protein)}g P · {Math.round(dayTotals.carbs)}g C · {Math.round(dayTotals.fat)}g F
+                  </span>
+                )}
+              </div>
+
+              {dayLoading ? (
+                <div style={{ fontSize: 13, color: '#777167' }}>Loading...</div>
+              ) : dayLogs.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#777167', padding: '8px 0' }}>No food logged this day.</div>
+              ) : (
+                <div style={{ maxHeight: 180, overflowY: 'auto', marginBottom: 10 }}>
+                  {dayLogs.map(entry => (
+                    <div key={entry._id} style={styles.modalLogRow}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{entry.foodName}</div>
+                        <div style={{ fontSize: 11, color: '#777167' }}>{entry.quantity}x · {entry.meal} · {Math.round(entry.calories)} kcal</div>
+                      </div>
+                      <button onClick={() => handleDayDeleteLog(entry._id)}
+                        style={{ background: 'none', border: 'none', color: '#c24337', fontSize: 16, cursor: 'pointer' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Food search */}
+              <form onSubmit={handleDaySearch} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input
+                  placeholder="Search foods to add..."
+                  value={daySearch}
+                  onChange={e => setDaySearch(e.target.value)}
+                  style={{ ...styles.modalInput, flex: 1 }}
+                />
+                <button type="submit" disabled={daySearching} style={styles.modalBtn}>
+                  {daySearching ? '...' : 'Search'}
+                </button>
+              </form>
+
+              {/* Search results */}
+              {daySearchResults.length > 0 && !daySelectedFood && (
+                <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid #eee', borderRadius: 10, marginBottom: 8 }}>
+                  {daySearchResults.map(food => (
+                    <div key={food._id} onClick={() => setDaySelectedFood(food)}
+                      style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}>
+                      <strong>{food.name}</strong>
+                      {food.brand && <span style={{ color: '#777167', marginLeft: 6 }}>{food.brand}</span>}
+                      <span style={{ float: 'right', color: '#188159', fontWeight: 600 }}>{food.calories} kcal</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Selected food form */}
+              {daySelectedFood && (
+                <form onSubmit={handleDayAddLog} style={{ background: '#F0FBF6', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <strong style={{ fontSize: 13 }}>{daySelectedFood.name}</strong>
+                    <button type="button" onClick={() => setDaySelectedFood(null)}
+                      style={{ background: 'none', border: 'none', color: '#c24337', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#777167', marginBottom: 8 }}>
+                    {daySelectedFood.calories} kcal · {daySelectedFood.protein}g P · {daySelectedFood.carbs}g C · {daySelectedFood.fat}g F per serving
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input type="number" min="0.1" step="0.1" value={dayQuantity}
+                      onChange={e => setDayQuantity(Number(e.target.value))}
+                      style={{ ...styles.modalInput, width: 70 }} />
+                    <select value={dayMeal} onChange={e => setDayMeal(e.target.value as Meal)}
+                      style={{ ...styles.modalInput, flex: 1 }}>
+                      {(['breakfast', 'lunch', 'dinner', 'snack'] as Meal[]).map(m => (
+                        <option key={m} value={m}>{m.charAt(0).toUpperCase() + m.slice(1)}</option>
+                      ))}
+                    </select>
+                    <button type="submit" disabled={dayAdding} style={styles.modalBtn}>
+                      {dayAdding ? '...' : 'Add'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -522,7 +778,7 @@ function CalorieChart({ days, target }: { days: DailySummary[]; target: number |
           rx={barW > 4 ? 2 : 0}
           fill={d.calories > 0 ? '#1FA873' : '#EFE9DE'}
         >
-          <title>{`${d.date}: ${d.calories} kcal`}</title>
+          <title>{`${d.date}: ${Math.round(d.calories)} kcal`}</title>
         </rect>
       ))}
       {target && (
@@ -602,4 +858,12 @@ const styles: any = {
 
   macroCol: { flex: '1 1 150px', display: 'flex', flexDirection: 'column', gap: 12 },
   macroCard: { flex: 1, background: '#fff', borderRadius: 14, padding: '10px 16px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', flexDirection: 'column', justifyContent: 'center' },
+
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  modalBox: { background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' },
+  modalSection: { marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #f0ede8' },
+  modalSectionTitle: { fontSize: 13, fontWeight: 700, color: '#2D2A26', marginBottom: 10 },
+  modalInput: { padding: '9px 12px', borderRadius: 10, background: '#FFF8ED', border: '1px solid transparent', fontSize: 13, outline: 'none' },
+  modalBtn: { padding: '9px 16px', background: '#188159', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' },
+  modalLogRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f5f5f5' },
 };
