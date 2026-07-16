@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getTargets, setTargets, getSuggestedTargets, updateProfile,
   getProfile, getStoredFirstName, getWater, getProgressSummary, todayString,
+  logout,
 } from '../api/client';
 
 type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
@@ -190,7 +191,7 @@ function GoalsPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={S.userTag}>Welcome back, {getStoredFirstName() || 'there'} 👋</div>
-          <button style={S.logoutBtn} onClick={() => navigate('/login')}>Logout</button>
+          <button style={S.logoutBtn} onClick={() => logout()}>Logout</button>
         </div>
       </div>
 
