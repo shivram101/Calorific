@@ -4,14 +4,13 @@ on:
   push:
     branches:
       - main
-
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: deploy-mern
+  group: deploy-mern-production
   cancel-in-progress: true
 
 jobs:
@@ -22,11 +21,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "22"
-          cache: "npm"
+          cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
             backend/package-lock.json
@@ -39,7 +38,12 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Clean frontend directory on droplet
+      - name: Verify frontend build
+        run: |
+          test -f frontend/dist/index.html
+          test -d frontend/dist/assets
+
+      - name: Prepare frontend directory on droplet
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -47,9 +51,8 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
           script: |
-            set -e
+            set -euo pipefail
 
-            echo "Preparing frontend directory..."
             mkdir -p /var/www/html
             rm -rf /var/www/html/*
 
@@ -65,7 +68,7 @@ jobs:
           strip_components: 2
           overwrite: true
 
-      - name: Clean backend directory on droplet
+      - name: Prepare backend directory on droplet
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -73,21 +76,19 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
           script: |
-            set -e
+            set -euo pipefail
 
-            echo "Preparing backend directory..."
             mkdir -p /var/calorificServer
-
-            echo "Cleaning old backend files while preserving .env and node_modules..."
-
             cd /var/calorificServer
 
+            # Preserve production-only data. The .env file remains on the
+            # droplet and is never copied from GitHub.
             for item in * .*; do
               case "$item" in
-                "."|".."|".env"|"node_modules"|"logs"|"uploads")
+                "."|".."|".env"|"logs"|"uploads")
                   ;;
                 *)
-                  rm -rf "$item"
+                  rm -rf -- "$item"
                   ;;
               esac
             done
@@ -104,7 +105,7 @@ jobs:
           strip_components: 1
           overwrite: true
 
-      - name: Install backend dependencies and restart backend
+      - name: Install, restart, and verify application
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -112,28 +113,86 @@ jobs:
           key: ${{ secrets.DROPLET_SSH_KEY }}
           port: ${{ secrets.DROPLET_PORT }}
           script: |
-            set -e
+            set -euo pipefail
 
-            cd /var/calorificServer
+            FRONTEND_DIR=/var/www/html
+            BACKEND_DIR=/var/calorificServer
+            APP_NAME=calorific-backend
 
-            echo "Installing backend dependencies..."
-            npm install --omit=dev
+            echo "Verifying deployed frontend..."
+            test -f "$FRONTEND_DIR/index.html"
+            test -d "$FRONTEND_DIR/assets"
+
+            echo "Verifying production environment file..."
+            if [ ! -s "$BACKEND_DIR/.env" ]; then
+              echo "ERROR: Missing or empty $BACKEND_DIR/.env"
+              exit 1
+            fi
+
+            cd "$BACKEND_DIR"
+
+            echo "Installing exact production dependencies..."
+            npm ci --omit=dev
+
+            echo "Checking required environment variables..."
+            node - <<'NODE'
+            require('dotenv').config();
+
+            const required = [
+              'MONGO_URI',
+              'JWT_SECRET',
+              'SENDGRID_API_KEY',
+              'SENDGRID_FROM_EMAIL',
+              'CLIENT_URL',
+              'FDC_API_KEY',
+              'PORT'
+            ];
+
+            const missing = required.filter((name) => !process.env[name]);
+
+            if (missing.length > 0) {
+              console.error(`Missing required environment variables: ${missing.join(', ')}`);
+              process.exit(1);
+            }
+
+            console.log('Required environment variables are present.');
+            NODE
 
             echo "Installing PM2 if needed..."
             if ! command -v pm2 >/dev/null 2>&1; then
-              npm install -g pm2
+              npm install --global pm2
             fi
 
-            echo "Restarting backend with PM2..."
-            pm2 reload calorific-backend --update-env || pm2 start server.js --name calorific-backend
+            echo "Starting or restarting backend..."
+            if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+              pm2 restart "$APP_NAME" --update-env
+            else
+              pm2 start server.js --name "$APP_NAME"
+            fi
 
-            echo "Saving PM2 process list..."
             pm2 save
 
-            echo "Testing Nginx config..."
+            echo "Waiting for backend health endpoint..."
+            curl --fail --silent --show-error \
+              --retry 10 --retry-delay 2 --retry-connrefused \
+              http://127.0.0.1:5000/api/health
+
+            echo "Testing Nginx configuration..."
             nginx -t
 
             echo "Reloading Nginx..."
             systemctl reload nginx
 
-            echo "Deployment complete."
+            echo "Verifying frontend through Nginx..."
+            curl --fail --silent --show-error \
+              --retry 5 --retry-delay 2 \
+              -H "Host: contactmanager24.xyz" \
+              http://127.0.0.1/ >/dev/null
+
+            echo "Verifying API through Nginx..."
+            curl --fail --silent --show-error \
+              --retry 5 --retry-delay 2 \
+              -H "Host: contactmanager24.xyz" \
+              http://127.0.0.1/api/health
+
+            echo "Deployment completed successfully."
