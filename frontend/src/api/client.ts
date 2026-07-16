@@ -7,7 +7,8 @@
 //   import { login, register, searchFoods, getLogs } from '../api/client';
 //   const { token, user } = await login('email@test.com', 'password123');
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = "https://contactmanager24.xyz/api"
+;
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 // The JWT is stored in localStorage after login and attached to every
@@ -141,6 +142,7 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   isVerified: boolean;
+  age: number | null;
   heightCm: number | null;
   weightKg: number | null;
   sex: string | null;
@@ -154,7 +156,7 @@ export async function getProfile(): Promise<UserProfile> {
 }
 
 export async function updateProfile(
-  updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
+  updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'age' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
 ): Promise<{ message: string; updates: typeof updates }> {
   return request('PUT', '/profile', { body: updates });
 }
