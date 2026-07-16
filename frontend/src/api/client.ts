@@ -14,15 +14,15 @@ const BASE_URL = 'http://localhost:5000/api';
 // protected request automatically.
 
 export function getToken(): string | null {
-  return localStorage.getItem('token');
+    return localStorage.getItem('token');
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem('token', token);
+    localStorage.setItem('token', token);
 }
 
 export function clearToken(): void {
-  localStorage.removeItem('token');
+    localStorage.removeItem('token');
 }
 
 // ─── Base fetch wrapper ───────────────────────────────────────────────────────
@@ -30,174 +30,193 @@ export function clearToken(): void {
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 interface RequestOptions {
-  auth?: boolean;       // attach Bearer token (default: true for non-auth routes)
-  body?: unknown;       // JSON body for POST/PUT
+    auth?: boolean;       // attach Bearer token (default: true for non-auth routes)
+    body?: unknown;       // JSON body for POST/PUT
 }
 
 async function request<T>(
-  method: Method,
-  path: string,
-  options: RequestOptions = {}
+    method: Method,
+    path: string,
+    options: RequestOptions = {}
 ): Promise<T> {
-  const { auth = true, body } = options;
+    const { auth = true, body } = options;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
 
-  if (auth) {
-    const token = getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    if (auth) {
+        const token = getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
     }
-  }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+    const res = await fetch(`${BASE_URL}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (!res.ok) {
-    // Throw the error message from the API so pages can display it directly
-    throw new Error(data.error || 'Something went wrong');
-  }
+    if (!res.ok) {
+        // Throw the error message from the API so pages can display it directly
+        throw new Error(data.error || 'Something went wrong');
+    }
 
-  return data as T;
+    return data as T;
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface RegisterResult {
-  message: string;
-  userId: string;
+    message: string;
+    userId: string;
 }
 
 export async function register(
-  email: string,
-  password: string,
-  firstName: string,
-  lastName: string
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
 ): Promise<RegisterResult> {
-  return request<RegisterResult>('POST', '/register', {
-    auth: false,
-    body: { email, password, firstName, lastName },
-  });
+    return request<RegisterResult>('POST', '/register', {
+        auth: false,
+        body: { email, password, firstName, lastName },
+    });
 }
 
 export interface LoginResult {
-  token: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
+    token: string;
+    user: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+    };
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
-  const result = await request<LoginResult>('POST', '/login', {
-    auth: false,
-    body: { email, password },
-  });
-  // Store the JWT so all subsequent calls are automatically authenticated
-  setToken(result.token);
-  return result;
+    const result = await request<LoginResult>('POST', '/login', {
+        auth: false,
+        body: { email, password },
+    });
+    // Store the JWT so all subsequent calls are automatically authenticated
+    setToken(result.token);
+    return result;
 }
 
 export function logout(): void {
-  clearToken();
-  window.location.href = '/login';
+    clearToken();
+    window.location.href = '/login';
 }
 
 export async function verifyEmail(token: string): Promise<{ message: string }> {
-  return request<{ message: string }>('GET', `/verify-email/${token}`, { auth: false });
+    return request<{ message: string }>('GET', `/verify-email/${token}`, { auth: false });
 }
 
 export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return request<{ message: string }>('POST', '/forgot-password', {
-    auth: false,
-    body: { email },
-  });
+    return request<{ message: string }>('POST', '/forgot-password', {
+        auth: false,
+        body: { email },
+    });
 }
 
 export async function resetPassword(
-  token: string,
-  newPassword: string
+    token: string,
+    newPassword: string
 ): Promise<{ message: string }> {
-  return request<{ message: string }>('POST', `/reset-password/${token}`, {
-    auth: false,
-    body: { newPassword },
-  });
+    return request<{ message: string }>('POST', `/reset-password/${token}`, {
+        auth: false,
+        body: { newPassword },
+    });
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export interface UserProfile {
-  _id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  isVerified: boolean;
-  age: number | null;
-  heightCm: number | null;
-  weightKg: number | null;
-  sex: string | null;
-  activityLevel: string | null;
-  goal: 'lose' | 'maintain' | 'gain' | null;
-  createdAt: string;
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isVerified: boolean;
+    age: number | null;
+    heightCm: number | null;
+    weightKg: number | null;
+    sex: string | null;
+    activityLevel: string | null;
+    goal: 'lose' | 'maintain' | 'gain' | null;
+    createdAt: string;
 }
 
 export async function getProfile(): Promise<UserProfile> {
-  return request<UserProfile>('GET', '/profile');
+    return request<UserProfile>('GET', '/profile');
 }
 
 export async function updateProfile(
-  updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'age' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
+    updates: Partial<Pick<UserProfile, 'firstName' | 'lastName' | 'age' | 'heightCm' | 'weightKg' | 'sex' | 'activityLevel' | 'goal'>>
 ): Promise<{ message: string; updates: typeof updates }> {
-  return request('PUT', '/profile', { body: updates });
+    return request('PUT', '/profile', { body: updates });
 }
 
 export async function deleteAccount(): Promise<{ message: string }> {
-  return request('DELETE', '/account');
+    return request('DELETE', '/account');
 }
 
 // ─── Foods ────────────────────────────────────────────────────────────────────
 
 export interface Food {
-  _id: string;
-  source: 'fdc' | 'user-submitted';
-  fdcId?: number;
-  name: string;
-  brand: string | null;
-  servingSize: number;
-  servingSizeUnit: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
+    _id: string;
+    source: 'fdc' | 'user-submitted';
+    fdcId?: number;
+    name: string;
+    brand: string | null;
+    servingSize: number;
+    servingSizeUnit: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
 }
 
 export async function searchFoods(query: string): Promise<Food[]> {
-  return request<Food[]>('GET', `/foods/search?q=${encodeURIComponent(query)}`);
+    return request<Food[]>('GET', `/foods/search?q=${encodeURIComponent(query)}`);
 }
 
 export async function getFoodDetail(id: string): Promise<Food> {
-  return request<Food>('GET', `/foods/${id}`);
+    return request<Food>('GET', `/foods/${id}`);
 }
 
 export async function createCustomFood(food: {
-  name: string;
-  servingSize?: number;
-  servingSizeUnit?: string;
-  calories: number;
-  protein?: number;
-  fat?: number;
-  carbs?: number;
+    name: string;
+    servingSize?: number;
+    servingSizeUnit?: string;
+    calories: number;
+    protein?: number;
+    fat?: number;
+    carbs?: number;
 }): Promise<Food> {
-  return request<Food>('POST', '/foods/custom', { body: food });
+    return request<Food>('POST', '/foods/custom', { body: food });
+}
+
+// GET /api/foods/:id/micronutrients
+// ASSUMPTION: response is pre-grouped by category, e.g.
+//   [{ category: 'Vitamins', nutrients: [{ name: 'Vitamin C', amount: 12, unit: 'mg' }, ...] }, ...]
+// Flag if your actual response shape differs and I'll adjust the accordion accordingly.
+export interface MicronutrientEntry {
+    name: string;
+    amount: number;
+    unit: string;
+}
+
+export interface MicronutrientGroup {
+    category: string;
+    nutrients: MicronutrientEntry[];
+}
+
+export async function getMicronutrients(foodId: string): Promise<MicronutrientGroup[]> {
+    return request<MicronutrientGroup[]>('GET', `/foods/${foodId}/micronutrients`);
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
@@ -205,129 +224,138 @@ export async function createCustomFood(food: {
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export interface LogEntry {
-  _id: string;
-  userId: string;
-  foodId: string;
-  foodName: string;
-  quantity: number;
-  meal: Meal;
-  date: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
-  createdAt: string;
-}
-
-export interface DailyLog {
-  date: string;
-  entries: LogEntry[];
-  totals: {
+    _id: string;
+    userId: string;
+    foodId: string;
+    foodName: string;
+    quantity: number;
+    meal: Meal;
+    date: string;
     calories: number;
     protein: number;
     fat: number;
     carbs: number;
-  };
+    createdAt: string;
+}
+
+export interface DailyLog {
+    date: string;
+    entries: LogEntry[];
+    totals: {
+        calories: number;
+        protein: number;
+        fat: number;
+        carbs: number;
+    };
 }
 
 // Returns today's date as a YYYY-MM-DD string
 export function todayString(): string {
-  return new Date().toISOString().slice(0, 10);
+    return new Date().toISOString().slice(0, 10);
 }
 
 export async function getLogs(date: string): Promise<DailyLog> {
-  return request<DailyLog>('GET', `/logs?date=${date}`);
+    return request<DailyLog>('GET', `/logs?date=${date}`);
 }
 
 export async function addLog(entry: {
-  foodId: string;
-  quantity: number;
-  meal: Meal;
-  date: string;
+    foodId: string;
+    quantity: number;
+    meal: Meal;
+    date: string;
 }): Promise<LogEntry> {
-  return request<LogEntry>('POST', '/logs', { body: entry });
+    return request<LogEntry>('POST', '/logs', { body: entry });
 }
 
 export async function updateLog(
-  id: string,
-  updates: { quantity?: number; meal?: Meal }
+    id: string,
+    updates: { quantity?: number; meal?: Meal }
 ): Promise<{ message: string }> {
-  return request('PUT', `/logs/${id}`, { body: updates });
+    return request('PUT', `/logs/${id}`, { body: updates });
 }
 
 export async function deleteLog(id: string): Promise<{ message: string }> {
-  return request('DELETE', `/logs/${id}`);
+    return request('DELETE', `/logs/${id}`);
 }
 
 // ─── Water ────────────────────────────────────────────────────────────────────
 
 export interface DailyWater {
-  date: string;
-  entries: { _id: string; amountMl: number; date: string; createdAt: string }[];
-  totalMl: number;
+    date: string;
+    entries: { _id: string; amountMl: number; date: string; createdAt: string }[];
+    totalMl: number;
 }
 
 export async function getWater(date: string): Promise<DailyWater> {
-  return request<DailyWater>('GET', `/water?date=${date}`);
+    return request<DailyWater>('GET', `/water?date=${date}`);
 }
 
 export async function addWater(amountMl: number, date: string): Promise<DailyWater> {
-  return request<DailyWater>('POST', '/water', { body: { amountMl, date } });
+    return request<DailyWater>('POST', '/water', { body: { amountMl, date } });
 }
 
 // ─── Targets ──────────────────────────────────────────────────────────────────
 
 export interface Targets {
-  _id: string;
-  userId: string;
-  calorieTarget: number;
-  proteinTarget: number;
-  carbTarget: number;
-  fatTarget: number;
-  updatedAt: string;
+    _id: string;
+    userId: string;
+    calorieTarget: number;
+    proteinTarget: number;
+    carbTarget: number;
+    fatTarget: number;
+    updatedAt: string;
 }
 
 export async function getTargets(): Promise<Targets | null> {
-  return request<Targets | null>('GET', '/targets');
+    return request<Targets | null>('GET', '/targets');
 }
 
 export async function setTargets(targets: {
-  calorieTarget: number;
-  proteinTarget: number;
-  carbTarget: number;
-  fatTarget: number;
+    calorieTarget: number;
+    proteinTarget: number;
+    carbTarget: number;
+    fatTarget: number;
 }): Promise<Targets> {
-  return request<Targets>('PUT', '/targets', { body: targets });
+    return request<Targets>('PUT', '/targets', { body: targets });
+}
+
+// GET /api/targets/suggested?goal=lose|maintain|gain
+// Server-calculated targets based on the user's profile (age/height/weight/activity)
+// and the requested goal. ASSUMPTION: response shape matches Targets below (same field
+// names as setTargets/getTargets) and the goal is passed as a `goal` query param —
+// flag if either of those is actually different and I'll adjust.
+export async function getSuggestedTargets(goal: 'lose' | 'maintain' | 'gain'): Promise<Targets> {
+    return request<Targets>('GET', `/targets/suggested?goal=${goal}`);
 }
 
 // ─── Progress ─────────────────────────────────────────────────────────────────
 
 export interface WeightEntry {
-  _id: string;
-  userId: string;
-  weightKg: number;
-  date: string;
-  createdAt: string;
+    _id: string;
+    userId: string;
+    weightKg: number;
+    date: string;
+    createdAt: string;
 }
 
 export async function logWeight(weightKg: number, date?: string): Promise<WeightEntry> {
-  return request<WeightEntry>('POST', '/progress/weight', {
-    body: { weightKg, date: date ?? todayString() },
-  });
+    return request<WeightEntry>('POST', '/progress/weight', {
+        body: { weightKg, date: date ?? todayString() },
+    });
 }
 
 export async function getWeightHistory(range = 30): Promise<{ range: number; entries: WeightEntry[] }> {
-  return request('GET', `/progress/weight?range=${range}`);
+    return request('GET', `/progress/weight?range=${range}`);
 }
 
 export interface DailySummary {
-  date: string;
-  calories: number;
-  protein: number;
-  fat: number;
-  carbs: number;
+    date: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
 }
 
 export async function getProgressSummary(range = 30): Promise<{ range: number; summary: DailySummary[] }> {
-  return request('GET', `/progress/summary?range=${range}`);
+    return request('GET', `/progress/summary?range=${range}`);
 }

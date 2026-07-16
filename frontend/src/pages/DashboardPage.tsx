@@ -10,381 +10,555 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  searchFoods,
-  getLogs,
-  addLog,
-  deleteLog,
-  getWater,
-  addWater,
-  logout,
-  todayString,
-  type Food,
-  type LogEntry,
-  type Meal,
+    searchFoods,
+    getLogs,
+    addLog,
+    deleteLog,
+    getWater,
+    addWater,
+    getMicronutrients,
+    logout,
+    todayString,
+    type Food,
+    type LogEntry,
+    type Meal,
+    type MicronutrientGroup,
 } from '../api/client';
 import { loadGoals } from './GoalsPage';
 
 const MEALS: Meal[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const MEAL_LABELS: Record<Meal, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snack: 'Snacks',
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snack: 'Snacks',
 };
 
 const TODAY = todayString();
+const WATER_GOAL_ML = 2000; // TODO: make this configurable per-user (e.g. on GoalsPage) once the backend supports it
+const QUICK_ADD_ML = [250, 350, 500];
+
+// Summed macros come back from the API as floating point (e.g. quantity 1.3 x protein 23.4g),
+// so anything derived from them needs rounding before it's shown — otherwise you get
+// "70.19999999999999g" instead of "70g".
+const round = (n: number) => Math.round(n);
 
 function DashboardPage() {
-  const navigate = useNavigate();
-  const GOALS = loadGoals();
+    const navigate = useNavigate();
+    const GOALS = loadGoals();
 
-  // Diary state
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const [totals, setTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
-  const [diaryLoading, setDiaryLoading] = useState(true);
+    // Diary state
+    const [entries, setEntries] = useState<LogEntry[]>([]);
+    const [totals, setTotals] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+    const [diaryLoading, setDiaryLoading] = useState(true);
 
-  // Food search state
-  const [search, setSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<Food[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
-  const [quantity, setQuantity] = useState(1);
-  const [meal, setMeal] = useState<Meal>('breakfast');
+    // Food search state
+    const [search, setSearch] = useState('');
+    const [searchResults, setSearchResults] = useState<Food[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+    const [quantity, setQuantity] = useState(1);
+    const [meal, setMeal] = useState<Meal>('breakfast');
 
-  // Water state
-  const [waterMl, setWaterMl] = useState(0);
-  const [waterInput, setWaterInput] = useState('');
+    // Water state
+    const [waterMl, setWaterMl] = useState(0);
+    const [waterInput, setWaterInput] = useState('');
 
-  // Error state
-  const [error, setError] = useState('');
+    // Error state
+    const [error, setError] = useState('');
 
-  // Load diary and water for today on mount
-  const loadDiary = useCallback(async () => {
-    try {
-      const [log, water] = await Promise.all([
-        getLogs(TODAY),
-        getWater(TODAY),
-      ]);
-      setEntries(log.entries);
-      setTotals(log.totals);
-      setWaterMl(water.totalMl);
-    } catch (err: any) {
-      if (err.message?.includes('Invalid or expired token')) {
-        logout();
-      }
-    } finally {
-      setDiaryLoading(false);
+    // Load diary and water for today on mount
+    const loadDiary = useCallback(async () => {
+        try {
+            const [log, water] = await Promise.all([
+                getLogs(TODAY),
+                getWater(TODAY),
+            ]);
+            setEntries(log.entries);
+            setTotals(log.totals);
+            setWaterMl(water.totalMl);
+        } catch (err: any) {
+            if (err.message?.includes('Invalid or expired token')) {
+                logout();
+            }
+        } finally {
+            setDiaryLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadDiary();
+    }, [loadDiary]);
+
+    // Food search
+    async function handleSearch(e: any) {
+        e.preventDefault();
+        if (!search.trim()) return;
+        setSearching(true);
+        setError('');
+        try {
+            const results = await searchFoods(search.trim());
+            setSearchResults(results);
+        } catch (err: any) {
+            setError(err.message || 'Search failed');
+        } finally {
+            setSearching(false);
+        }
     }
-  }, []);
 
-  useEffect(() => {
-    loadDiary();
-  }, [loadDiary]);
-
-  // Food search
-  async function handleSearch(e: any) {
-    e.preventDefault();
-    if (!search.trim()) return;
-    setSearching(true);
-    setError('');
-    try {
-      const results = await searchFoods(search.trim());
-      setSearchResults(results);
-    } catch (err: any) {
-      setError(err.message || 'Search failed');
-    } finally {
-      setSearching(false);
+    // Log selected food
+    async function handleAddLog(e: any) {
+        e.preventDefault();
+        if (!selectedFood) return;
+        setError('');
+        try {
+            await addLog({
+                foodId: selectedFood._id,
+                quantity,
+                meal,
+                date: TODAY,
+            });
+            setSelectedFood(null);
+            setQuantity(1);
+            setSearchResults([]);
+            setSearch('');
+            await loadDiary();
+        } catch (err: any) {
+            setError(err.message || 'Failed to log food');
+        }
     }
-  }
 
-  // Log selected food
-  async function handleAddLog(e: any) {
-    e.preventDefault();
-    if (!selectedFood) return;
-    setError('');
-    try {
-      await addLog({
-        foodId: selectedFood._id,
-        quantity,
-        meal,
-        date: TODAY,
-      });
-      setSelectedFood(null);
-      setQuantity(1);
-      setSearchResults([]);
-      setSearch('');
-      await loadDiary();
-    } catch (err: any) {
-      setError(err.message || 'Failed to log food');
+    // Delete log entry
+    async function handleDeleteLog(id: string) {
+        setError('');
+        try {
+            await deleteLog(id);
+            await loadDiary();
+        } catch (err: any) {
+            setError(err.message || 'Failed to delete entry');
+        }
     }
-  }
 
-  // Delete log entry
-  async function handleDeleteLog(id: string) {
-    setError('');
-    try {
-      await deleteLog(id);
-      await loadDiary();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete entry');
+    // Log water — updates the widget immediately (optimistic), then reconciles with the server response.
+    async function addWaterAmount(amount: number) {
+        if (!amount || amount <= 0) return;
+        setError('');
+        setWaterMl(prev => prev + amount); // reflect it on screen right away
+        try {
+            const result = await addWater(amount, TODAY);
+            setWaterMl(result.totalMl); // true value from server (handles rounding, multi-tab, etc.)
+        } catch (err: any) {
+            setWaterMl(prev => prev - amount); // roll back since it didn't actually save
+            setError(err.message || 'Failed to log water');
+        }
     }
-  }
 
-  // Log water
-  async function handleAddWater(e: any) {
-    e.preventDefault();
-    const amount = Number(waterInput);
-    if (!amount || amount <= 0) return;
-    setError('');
-    try {
-      const result = await addWater(amount, TODAY);
-      setWaterMl(result.totalMl);
-      setWaterInput('');
-    } catch (err: any) {
-      setError(err.message || 'Failed to log water');
+    async function handleAddWater(e: any) {
+        e.preventDefault();
+        const amount = Number(waterInput);
+        if (!amount || amount <= 0) return;
+        setWaterInput('');
+        await addWaterAmount(amount);
     }
-  }
 
-  const grouped = MEALS.reduce((acc, m) => {
-    acc[m] = entries.filter(e => e.meal === m);
-    return acc;
-  }, {} as Record<Meal, LogEntry[]>);
+    async function handleQuickAddWater(amount: number) {
+        await addWaterAmount(amount);
+    }
 
-  const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    const grouped = MEALS.reduce((acc, m) => {
+        acc[m] = entries.filter(e => e.meal === m);
+        return acc;
+    }, {} as Record<Meal, LogEntry[]>);
 
-  return (
-    <div style={styles.page}>
-      {/* TOP RIBBON */}
-      <div style={styles.ribbon}>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <div style={styles.brand}>Calorific</div>
-          <div style={styles.ribbonItem}>Log</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/goals')}>Goals</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
-        </div>
-        <div style={styles.ribbonRight}>
-          <div style={styles.userTag}>Logged in</div>
-          <button style={styles.logoutBtn} onClick={logout}>Logout</button>
-        </div>
-      </div>
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
 
-      {error && (
-        <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
-          {error}
-        </div>
-      )}
-
-      <div style={styles.topGrid}>
-        {/* LOG FOOD CARD */}
-        <div style={styles.card}>
-          <div style={styles.header}>
-            <h2 style={{ margin: 0, fontSize: 18 }}>Log food</h2>
-          </div>
-
-          {/* Search */}
-          <form onSubmit={handleSearch} style={styles.searchRow}>
-            <input aria-label="Search foods" placeholder="Search foods..." value={search} onChange={e => setSearch(e.target.value)} style={styles.search} />
-            <button type="submit" style={styles.searchBtn} disabled={searching}>
-              {searching ? '...' : 'Search'}
-            </button>
-          </form>
-
-          {/* Search results */}
-          {searchResults.length > 0 && !selectedFood && (
-            <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 14, border: '1px solid #eee', borderRadius: 10 }}>
-              {searchResults.map(food => (
-                <div key={food._id}
-                  onClick={() => setSelectedFood(food)}
-                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}
-                >
-                  <strong>{food.name}</strong>
-                  {food.brand && <span style={{ color: '#777167', marginLeft: 6 }}>{food.brand}</span>}
-                  <span style={{ float: 'right', color: '#188159', fontWeight: 600 }}>{food.calories} kcal</span>
+    return (
+        <div style={styles.page}>
+            {/* TOP RIBBON */}
+            <div style={styles.ribbon}>
+                <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
+                    <div style={styles.brand}>Calorific</div>
+                    <div style={styles.ribbonItem}>Log</div>
+                    <div style={styles.ribbonItemMuted} onClick={() => navigate('/goals')}>Goals</div>
+                    <div style={styles.ribbonItemMuted} onClick={() => navigate('/progress')}>Trends</div>
+                    <div style={styles.ribbonItemMuted} onClick={() => navigate('/settings')}>Settings</div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Selected food form */}
-          {selectedFood && (
-            <form onSubmit={handleAddLog} style={{ marginBottom: 14, background: '#F0FBF6', borderRadius: 12, padding: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                <strong style={{ fontSize: 13 }}>{selectedFood.name}</strong>
-                <button type="button" onClick={() => setSelectedFood(null)}
-                  style={{ background: 'none', border: 'none', color: '#c24337', cursor: 'pointer', fontSize: 16 }}>✕</button>
-              </div>
-              <div style={{ fontSize: 12, color: '#777167', marginBottom: 10 }}>
-                Per serving: {selectedFood.calories} kcal · {selectedFood.protein}g P · {selectedFood.carbs}g C · {selectedFood.fat}g F
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input type="number" min="0.1" step="0.1" value={quantity} onChange={e => setQuantity(Number(e.target.value))}
-                  aria-label="Quantity" style={{ ...styles.input, maxWidth: 80 }} placeholder="Qty" />
-                <select value={meal} onChange={e => setMeal(e.target.value as Meal)} aria-label="Meal" style={styles.select}>
-                  {MEALS.map(m => <option key={m} value={m}>{MEAL_LABELS[m]}</option>)}
-                </select>
-                <button type="submit" style={styles.addBtn}>Add</button>
-              </div>
-            </form>
-          )}
-
-          {/* Water tracker */}
-          <div style={{ marginTop: 14, borderTop: '1px solid #eee', paddingTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-              <strong style={{ fontSize: 13 }}>💧 Water today</strong>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#2e74ba' }}>{waterMl} ml</span>
-            </div>
-            <form onSubmit={handleAddWater} style={{ display: 'flex', gap: 8 }}>
-              <input type="number" aria-label="Water amount in milliliters" placeholder="ml (e.g. 250)" value={waterInput} onChange={e => setWaterInput(e.target.value)}
-                style={{ ...styles.input, flex: 1 }} />
-              <button type="submit" style={{ ...styles.addBtn, background: '#2e74ba' }}>+ Water</button>
-            </form>
-          </div>
-        </div>
-
-        {/* TODAY SUMMARY */}
-        <div style={styles.summaryCol}>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryEyebrow}>Today</div>
-            <div style={styles.summaryDate}>{today}</div>
-            <div style={styles.summaryCalLabel}>Calories</div>
-            <div style={styles.summaryCalValue}>{totals.calories.toLocaleString()}</div>
-          </div>
-          <div style={styles.macroCard}>
-            {[
-              { label: 'Fat', value: totals.fat, color: '#2e74ba' },
-              { label: 'Protein', value: totals.protein, color: '#c24337' },
-              { label: 'Carbs', value: totals.carbs, color: '#9b6719' },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={styles.macroItem}>
-                <div style={{ ...styles.macroValue, color }}>{value}g</div>
-                <div style={styles.macroLabel}>{label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* FOOD DIARY */}
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Food diary</h2>
-          <p style={{ margin: 0, color: '#777167' }}>Total calories: {totals.calories}</p>
-        </div>
-
-        {diaryLoading ? (
-          <p style={{ color: '#777167', fontSize: 13 }}>Loading diary...</p>
-        ) : (
-          MEALS.map(m => {
-            const items = grouped[m];
-            const mealCalories = items.reduce((s, i) => s + i.calories, 0);
-            return (
-              <div key={m} style={styles.section}>
-                <div style={styles.sectionHeader}>
-                  <strong>{MEAL_LABELS[m]}</strong>
-                  <span style={{ color: '#777167' }}>{mealCalories} kcal</span>
+                <div style={styles.ribbonRight}>
+                    <div style={styles.userTag}>Logged in</div>
+                    <button style={styles.logoutBtn} onClick={logout}>Logout</button>
                 </div>
-                {items.length === 0 ? (
-                  <div style={styles.empty}>No entries</div>
-                ) : (
-                  items.map(item => (
-                    <div key={item._id} style={styles.row}>
-                      <div>
-                        <div style={styles.foodName}>{item.foodName}</div>
-                        <div style={styles.meta}>{item.quantity}x serving</div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <span style={styles.metaBold}>{item.calories} kcal</span>
-                        <span style={{ ...styles.macroTag, color: '#c24337' }}>{item.protein}g P</span>
-                        <span style={{ ...styles.macroTag, color: '#9b6719' }}>{item.carbs}g C</span>
-                        <span style={{ ...styles.macroTag, color: '#2e74ba' }}>{item.fat}g F</span>
-                        <button onClick={() => handleDeleteLog(item._id)} style={styles.delete}>✕</button>
-                      </div>
+            </div>
+
+            {error && (
+                <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px' }}>
+                    {error}
+                </div>
+            )}
+
+            <div style={styles.topGrid}>
+                {/* LOG FOOD CARD */}
+                <div style={styles.card}>
+                    <div style={styles.header}>
+                        <h2 style={{ margin: 0, fontSize: 18 }}>Log food</h2>
                     </div>
-                  ))
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
 
-      {/* GOALS */}
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <h2 style={{ margin: 0, fontSize: 18 }}>Goals</h2>
+                    {/* Search */}
+                    <form onSubmit={handleSearch} style={styles.searchRow}>
+                        <input aria-label="Search foods" placeholder="Search foods..." value={search} onChange={e => setSearch(e.target.value)} style={styles.search} />
+                        <button type="submit" style={styles.searchBtn} disabled={searching}>
+                            {searching ? '...' : 'Search'}
+                        </button>
+                    </form>
+
+                    {/* Search results */}
+                    {searchResults.length > 0 && !selectedFood && (
+                        <div style={{ maxHeight: 200, overflowY: 'auto', marginBottom: 14, border: '1px solid #eee', borderRadius: 10 }}>
+                            {searchResults.map(food => (
+                                <div key={food._id}
+                                    onClick={() => setSelectedFood(food)}
+                                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f5f5f5', fontSize: 13 }}
+                                >
+                                    <strong>{food.name}</strong>
+                                    {food.brand && <span style={{ color: '#777167', marginLeft: 6 }}>{food.brand}</span>}
+                                    <span style={{ float: 'right', color: '#188159', fontWeight: 600 }}>{food.calories} kcal</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Selected food form */}
+                    {selectedFood && (
+                        <form onSubmit={handleAddLog} style={{ marginBottom: 14, background: '#F0FBF6', borderRadius: 12, padding: 14 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <strong style={{ fontSize: 13 }}>{selectedFood.name}</strong>
+                                <button type="button" onClick={() => setSelectedFood(null)}
+                                    style={{ background: 'none', border: 'none', color: '#c24337', cursor: 'pointer', fontSize: 16 }}>✕</button>
+                            </div>
+                            <div style={{ fontSize: 12, color: '#777167', marginBottom: 10 }}>
+                                Per serving: {selectedFood.calories} kcal · {selectedFood.protein}g P · {selectedFood.carbs}g C · {selectedFood.fat}g F
+                            </div>
+                            <MicronutrientPanel foodId={selectedFood._id} />
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                                <input type="number" min="0.1" step="0.1" value={quantity} onChange={e => setQuantity(Number(e.target.value))}
+                                    aria-label="Quantity" style={{ ...styles.input, maxWidth: 80 }} placeholder="Qty" />
+                                <select value={meal} onChange={e => setMeal(e.target.value as Meal)} aria-label="Meal" style={styles.select}>
+                                    {MEALS.map(m => <option key={m} value={m}>{MEAL_LABELS[m]}</option>)}
+                                </select>
+                                <button type="submit" style={styles.addBtn}>Add</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {/* Water tracker */}
+                    <div style={{ marginTop: 14, borderTop: '1px solid #eee', paddingTop: 14 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12, alignItems: 'center' }}>
+                            <strong style={{ fontSize: 13 }}>💧 Water today</strong>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#2e74ba' }}>
+                                {waterMl} <span style={{ color: '#9db6cc', fontWeight: 500 }}>/ {WATER_GOAL_ML} ml</span>
+                            </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+                            <WaterGlass ml={waterMl} goalMl={WATER_GOAL_ML} />
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {QUICK_ADD_ML.map(amount => (
+                                        <button key={amount} type="button" onClick={() => handleQuickAddWater(amount)} style={styles.waterQuickBtn}>
+                                            + {amount} ml
+                                        </button>
+                                    ))}
+                                </div>
+                                <form onSubmit={handleAddWater} style={{ display: 'flex', gap: 8 }}>
+                                    <input type="number" aria-label="Custom water amount in milliliters" placeholder="Custom ml" value={waterInput} onChange={e => setWaterInput(e.target.value)}
+                                        style={{ ...styles.input, flex: 1 }} />
+                                    <button type="submit" style={{ ...styles.addBtn, background: '#2e74ba' }}>Add</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* TODAY SUMMARY */}
+                <div style={styles.summaryCol}>
+                    <div style={styles.summaryCard}>
+                        <div style={styles.summaryBar} />
+                        <div style={styles.summaryCardInner}>
+                            <div style={styles.summaryTopRow}>
+                                <div>
+                                    <div style={styles.summaryEyebrow}>🔥 Today</div>
+                                    <div style={styles.summaryDate}>{today}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                    <div style={styles.summaryCalLabel}>Calories</div>
+                                    <div style={styles.summaryCalValue}>{round(totals.calories).toLocaleString()}</div>
+                                </div>
+                            </div>
+                            <div style={styles.summaryProgressTrack}>
+                                <div style={{
+                                    ...styles.summaryProgressFill,
+                                    width: `${Math.min(GOALS.calories > 0 ? (totals.calories / GOALS.calories) * 100 : 0, 100)}%`,
+                                }} />
+                            </div>
+                            <div style={styles.summaryProgressLabel}>
+                                {GOALS.calories > round(totals.calories)
+                                    ? `${(GOALS.calories - round(totals.calories)).toLocaleString()} kcal left`
+                                    : `${(round(totals.calories) - GOALS.calories).toLocaleString()} kcal over`} · goal {GOALS.calories.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+                    <div style={styles.macroCard}>
+                        {[
+                            { label: 'Fat', value: totals.fat, color: '#2e74ba' },
+                            { label: 'Protein', value: totals.protein, color: '#c24337' },
+                            { label: 'Carbs', value: totals.carbs, color: '#9b6719' },
+                        ].map(({ label, value, color }) => (
+                            <div key={label} style={styles.macroItem}>
+                                <div style={{ ...styles.macroValue, color }}>{round(value)}g</div>
+                                <div style={styles.macroLabel}>{label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* FOOD DIARY */}
+            <div style={styles.card}>
+                <div style={styles.header}>
+                    <h2 style={{ margin: 0, fontSize: 18 }}>Food diary</h2>
+                    <p style={{ margin: 0, color: '#777167' }}>Total calories: {round(totals.calories)}</p>
+                </div>
+
+                {diaryLoading ? (
+                    <p style={{ color: '#777167', fontSize: 13 }}>Loading diary...</p>
+                ) : (
+                    MEALS.map(m => {
+                        const items = grouped[m];
+                        const mealCalories = round(items.reduce((s, i) => s + i.calories, 0));
+                        return (
+                            <div key={m} style={styles.section}>
+                                <div style={styles.sectionHeader}>
+                                    <strong>{MEAL_LABELS[m]}</strong>
+                                    <span style={{ color: '#777167' }}>{mealCalories} kcal</span>
+                                </div>
+                                {items.length === 0 ? (
+                                    <div style={styles.empty}>No entries</div>
+                                ) : (
+                                    items.map(item => (
+                                        <div key={item._id} style={styles.row}>
+                                            <div>
+                                                <div style={styles.foodName}>{item.foodName}</div>
+                                                <div style={styles.meta}>{item.quantity}x serving</div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                                                <span style={styles.metaBold}>{round(item.calories)} kcal</span>
+                                                <span style={{ ...styles.macroTag, color: '#c24337' }}>{round(item.protein)}g P</span>
+                                                <span style={{ ...styles.macroTag, color: '#9b6719' }}>{round(item.carbs)}g C</span>
+                                                <span style={{ ...styles.macroTag, color: '#2e74ba' }}>{round(item.fat)}g F</span>
+                                                <button onClick={() => handleDeleteLog(item._id)} style={styles.delete}>✕</button>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            {/* GOALS */}
+            <div style={styles.card}>
+                <div style={styles.header}>
+                    <h2 style={{ margin: 0, fontSize: 18 }}>Goals</h2>
+                </div>
+                <div style={styles.ringsRow}>
+                    <ProgressRing value={totals.calories} max={GOALS.calories} color="#1FA873" label="Calories" unit="kcal" />
+                    <ProgressRing value={totals.protein} max={GOALS.protein} color="#DC4C3F" label="Protein" unit="g" />
+                    <ProgressRing value={totals.carbs} max={GOALS.carbs} color="#EF9F27" label="Carbs" unit="g" />
+                    <ProgressRing value={totals.fat} max={GOALS.fat} color="#378ADD" label="Fat" unit="g" />
+                </div>
+            </div>
         </div>
-        <div style={styles.ringsRow}>
-          <ProgressRing value={totals.calories} max={GOALS.calories} color="#1FA873" label="Calories" unit="kcal" />
-          <ProgressRing value={totals.protein} max={GOALS.protein} color="#DC4C3F" label="Protein" unit="g" />
-          <ProgressRing value={totals.carbs} max={GOALS.carbs} color="#EF9F27" label="Carbs" unit="g" />
-          <ProgressRing value={totals.fat} max={GOALS.fat} color="#378ADD" label="Fat" unit="g" />
+    );
+}
+
+function WaterGlass({ ml, goalMl }: { ml: number; goalMl: number }) {
+    const pct = Math.max(0, Math.min(ml / goalMl, 1));
+    const width = 64, height = 84;
+    // Glass interior (trapezoid, slightly narrower at the base)
+    const top = { left: 6, right: width - 6 };
+    const bottom = { left: 12, right: width - 12 };
+    const glassPath = `M ${top.left} 4 L ${top.right} 4 L ${bottom.right} ${height - 4} L ${bottom.left} ${height - 4} Z`;
+
+    // Interpolate the fill's left/right edges at a given height fraction from the bottom
+    const edgesAt = (fracFromBottom: number) => ({
+        left: bottom.left + (top.left - bottom.left) * fracFromBottom,
+        right: bottom.right + (top.right - bottom.right) * fracFromBottom,
+    });
+    const fillTopY = 4 + (height - 8) * (1 - pct);
+    const fillFrac = (height - 4 - fillTopY) / (height - 8);
+    const fillEdges = edgesAt(fillFrac);
+    const fillPath = pct > 0
+        ? `M ${fillEdges.left} ${fillTopY} L ${fillEdges.right} ${fillTopY} L ${bottom.right} ${height - 4} L ${bottom.left} ${height - 4} Z`
+        : '';
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+                <defs>
+                    <clipPath id="water-glass-clip">
+                        <path d={glassPath} />
+                    </clipPath>
+                </defs>
+                {fillPath && (
+                    <path d={fillPath} fill="#5AA8E8" clipPath="url(#water-glass-clip)" style={{ transition: 'd 0.4s ease' }} />
+                )}
+                <path d={glassPath} fill="none" stroke="#2e74ba" strokeWidth={2.5} strokeLinejoin="round" />
+            </svg>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#2e74ba' }}>{Math.round(pct * 100)}%</div>
         </div>
-      </div>
-    </div>
-  );
+    );
+}
+
+// Collapsed by default; only calls GET /api/foods/:id/micronutrients the first time it's expanded.
+// Exported so the same panel can be reused wherever else a food's micronutrients need to show up.
+export function MicronutrientPanel({ foodId }: { foodId: string }) {
+    const [expanded, setExpanded] = useState(false);
+    const [groups, setGroups] = useState<MicronutrientGroup[] | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [openCategory, setOpenCategory] = useState<string | null>(null);
+
+    async function toggle() {
+        const next = !expanded;
+        setExpanded(next);
+        if (next && groups === null && !loading) {
+            setLoading(true);
+            setError('');
+            try {
+                const data = await getMicronutrients(foodId);
+                setGroups(data);
+                if (data.length) setOpenCategory(data[0].category);
+            } catch (err: any) {
+                setError(err.message || 'Could not load nutrition facts');
+            } finally {
+                setLoading(false);
+            }
+        }
+    }
+
+    return (
+        <div style={{ marginBottom: 4 }}>
+            <button type="button" onClick={toggle} style={styles.microToggle}>
+                {expanded ? '▾' : '▸'} {expanded ? 'Hide' : 'Show'} nutrition facts
+            </button>
+
+            {expanded && (
+                <div style={styles.microPanel}>
+                    {loading && <div style={styles.microMsg}>Loading nutrition facts...</div>}
+                    {error && <div style={{ ...styles.microMsg, color: '#c24337' }}>{error}</div>}
+                    {groups && groups.length === 0 && <div style={styles.microMsg}>No micronutrient data for this food.</div>}
+                    {groups && groups.map(group => (
+                        <div key={group.category} style={styles.microGroup}>
+                            <button
+                                type="button"
+                                onClick={() => setOpenCategory(c => (c === group.category ? null : group.category))}
+                                style={styles.microGroupHeader}
+                            >
+                                <span>{group.category}</span>
+                                <span>{openCategory === group.category ? '−' : '+'}</span>
+                            </button>
+                            {openCategory === group.category && (
+                                <div style={styles.microGroupBody}>
+                                    {group.nutrients.map(n => (
+                                        <div key={n.name} style={styles.microRow}>
+                                            <span>{n.name}</span>
+                                            <span style={{ fontWeight: 600 }}>{Math.round(n.amount * 10) / 10}{n.unit}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 }
 
 function ProgressRing({ value, max, color, label, unit }: { value: number; max: number; color: string; label: string; unit: string }) {
-  const size = 96, stroke = 9, radius = (size - stroke) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - Math.min(max > 0 ? value / max : 0, 1) * circumference;
-  return (
-    <div style={styles.ringWrap}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle stroke="#EEEEEE" fill="transparent" strokeWidth={stroke} r={radius} cx={size / 2} cy={size / 2} />
-        <circle stroke={color} fill="transparent" strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={offset}
-          r={radius} cx={size / 2} cy={size / 2}
-          style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.4s' }} />
-        <text x="50%" y="46%" textAnchor="middle" style={{ fontSize: 18, fontWeight: 700, fill: '#2D2A26' }}>{value}</text>
-        <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 10, fill: '#777167' }}>/ {max}{unit}</text>
-      </svg>
-      <div style={styles.ringLabel}>{label}</div>
-    </div>
-  );
+    const size = 96, stroke = 9, radius = (size - stroke) / 2;
+    const circumference = radius * 2 * Math.PI;
+    const offset = circumference - Math.min(max > 0 ? value / max : 0, 1) * circumference;
+    return (
+        <div style={styles.ringWrap}>
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                <circle stroke="#EEEEEE" fill="transparent" strokeWidth={stroke} r={radius} cx={size / 2} cy={size / 2} />
+                <circle stroke={color} fill="transparent" strokeWidth={stroke} strokeLinecap="round"
+                    strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={offset}
+                    r={radius} cx={size / 2} cy={size / 2}
+                    style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.4s' }} />
+                <text x="50%" y="46%" textAnchor="middle" style={{ fontSize: 18, fontWeight: 700, fill: '#2D2A26' }}>{Math.round(value)}</text>
+                <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 10, fill: '#777167' }}>/ {Math.round(max)}{unit}</text>
+            </svg>
+            <div style={styles.ringLabel}>{label}</div>
+        </div>
+    );
 }
 
 export default DashboardPage;
 
 const styles: any = {
-  page: { minHeight: '100vh', background: '#FFF8ED', padding: 20, fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 15 },
-  ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
-  brand: { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
-  ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
-  ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
-  ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
-  userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
-  logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
-  topGrid: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 15, alignItems: 'start' },
-  card: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
-  summaryCol: { display: 'flex', flexDirection: 'column', gap: 15 },
-  summaryCard: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
-  summaryEyebrow: { fontSize: 11, fontWeight: 700, color: '#188159', letterSpacing: 0.5 },
-  summaryDate: { fontSize: 13, fontWeight: 600, color: '#2D2A26', marginBottom: 12 },
-  summaryCalLabel: { fontSize: 11, color: '#777167', textAlign: 'right' },
-  summaryCalValue: { fontSize: 28, fontWeight: 700, color: '#2D2A26', textAlign: 'right' },
-  macroCard: { background: '#fff', borderRadius: 16, padding: '16px 20px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between' },
-  macroItem: { textAlign: 'center' },
-  macroValue: { fontSize: 18, fontWeight: 700 },
-  macroLabel: { fontSize: 11, color: '#777167', marginTop: 2 },
-  header: { display: 'flex', justifyContent: 'space-between', marginBottom: 15 },
-  searchRow: { display: 'flex', gap: 10, marginBottom: 10 },
-  search: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: '1px solid transparent', outline: 'none' },
-  searchBtn: { padding: '10px 14px', background: '#188159', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer' },
-  input: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none', outline: 'none' },
-  select: { padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none' },
-  addBtn: { background: '#188159', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
-  section: { marginBottom: 15 },
-  sectionHeader: { display: 'flex', justifyContent: 'space-between', background: '#F3F6FF', padding: 10, borderRadius: 8, marginBottom: 8 },
-  row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderBottom: '1px solid #eee' },
-  foodName: { fontWeight: 600 },
-  meta: { fontSize: 12, color: '#777167' },
-  metaBold: { fontSize: 13, fontWeight: 700, color: '#2D2A26', minWidth: 70, textAlign: 'right' },
-  macroTag: { fontSize: 12, fontWeight: 600 },
-  delete: { border: 'none', background: 'transparent', color: '#c24337', fontSize: 16, cursor: 'pointer' },
-  empty: { fontSize: 12, color: '#767676', padding: 10 },
-  ringsRow: { display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 20 },
-  ringWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
-  ringLabel: { fontSize: 12, fontWeight: 600, color: '#2D2A26' },
+    page: { minHeight: '100vh', background: '#FFF8ED', padding: 20, fontFamily: 'Arial', display: 'flex', flexDirection: 'column', gap: 15 },
+    ribbon: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)' },
+    brand: { fontWeight: 700, fontSize: 15, color: '#2D2A26' },
+    ribbonItem: { fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #1FA873', paddingBottom: 2 },
+    ribbonItemMuted: { fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' },
+    ribbonRight: { display: 'flex', alignItems: 'center', gap: 10 },
+    userTag: { fontSize: 12, color: '#2D2A26', background: '#FFF8ED', padding: '6px 10px', borderRadius: 10 },
+    logoutBtn: { background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600 },
+    topGrid: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 15, alignItems: 'start' },
+    card: { background: '#fff', borderRadius: 16, padding: 20, boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
+    summaryCol: { display: 'flex', flexDirection: 'column', gap: 15 },
+    summaryCard: { background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 28px rgba(0,0,0,0.07)' },
+    summaryBar: { height: 6, background: 'linear-gradient(90deg, #1FA873, #7ED9AF)' },
+    summaryCardInner: { padding: '18px 20px 20px' },
+    summaryTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+    summaryEyebrow: { fontSize: 11, fontWeight: 700, color: '#188159', letterSpacing: 0.5 },
+    summaryDate: { fontSize: 13, fontWeight: 600, color: '#2D2A26', marginTop: 4 },
+    summaryCalLabel: { fontSize: 11, color: '#777167' },
+    summaryCalValue: { fontSize: 28, fontWeight: 700, color: '#2D2A26', lineHeight: 1.2 },
+    summaryProgressTrack: { height: 8, background: '#F0EDE8', borderRadius: 6, overflow: 'hidden' },
+    summaryProgressFill: { height: '100%', background: '#1FA873', borderRadius: 6, transition: 'width 0.4s ease' },
+    summaryProgressLabel: { fontSize: 11, color: '#777167', marginTop: 8, textAlign: 'right' },
+    macroCard: { background: '#fff', borderRadius: 16, padding: '16px 20px', boxShadow: '0 10px 28px rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'space-between' },
+    macroItem: { textAlign: 'center' },
+    macroValue: { fontSize: 18, fontWeight: 700 },
+    macroLabel: { fontSize: 11, color: '#777167', marginTop: 2 },
+    header: { display: 'flex', justifyContent: 'space-between', marginBottom: 15 },
+    searchRow: { display: 'flex', gap: 10, marginBottom: 10 },
+    search: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: '1px solid transparent', outline: 'none' },
+    searchBtn: { padding: '10px 14px', background: '#188159', color: '#fff', borderRadius: 10, border: 'none', fontWeight: 600, cursor: 'pointer' },
+    input: { flex: 1, padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none', outline: 'none' },
+    select: { padding: 10, borderRadius: 10, background: '#FFF8ED', border: 'none' },
+    addBtn: { background: '#188159', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 14px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' },
+    waterQuickBtn: { background: '#EAF3FC', color: '#2e74ba', border: '1px solid #cfe2f7', borderRadius: 10, padding: '7px 12px', fontWeight: 600, fontSize: 12, cursor: 'pointer' },
+    microToggle: { background: 'none', border: 'none', color: '#188159', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '2px 0' },
+    microPanel: { marginTop: 8, background: '#fff', borderRadius: 10, border: '1px solid #E8E4DC', overflow: 'hidden' },
+    microMsg: { fontSize: 12, color: '#777167', padding: '10px 12px' },
+    microGroup: { borderBottom: '1px solid #F0EDE8' },
+    microGroupHeader: { width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', padding: '9px 12px', fontSize: 12, fontWeight: 700, color: '#2D2A26', cursor: 'pointer', textAlign: 'left' as const },
+    microGroupBody: { padding: '0 12px 10px' },
+    microRow: { display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#555049', padding: '4px 0' },
+    section: { marginBottom: 15 },
+    sectionHeader: { display: 'flex', justifyContent: 'space-between', background: '#F3F6FF', padding: 10, borderRadius: 8, marginBottom: 8 },
+    row: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 10, borderBottom: '1px solid #eee' },
+    foodName: { fontWeight: 600 },
+    meta: { fontSize: 12, color: '#777167' },
+    metaBold: { fontSize: 13, fontWeight: 700, color: '#2D2A26', minWidth: 70, textAlign: 'right' },
+    macroTag: { fontSize: 12, fontWeight: 600 },
+    delete: { border: 'none', background: 'transparent', color: '#c24337', fontSize: 16, cursor: 'pointer' },
+    empty: { fontSize: 12, color: '#767676', padding: 10 },
+    ringsRow: { display: 'flex', justifyContent: 'space-around', flexWrap: 'wrap', gap: 20 },
+    ringWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 },
+    ringLabel: { fontSize: 12, fontWeight: 600, color: '#2D2A26' },
 };
