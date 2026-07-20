@@ -33,7 +33,7 @@ function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(160deg,#FFF8ED 0%,#F0FBF6 100%)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, position:'relative', overflow:'hidden', fontFamily:"'Inter',Arial,sans-serif" }}>
+    <main style={{ minHeight:'100vh', background:'linear-gradient(160deg,#FFF8ED 0%,#F0FBF6 100%)', display:'flex', alignItems:'center', justifyContent:'center', padding:24, position:'relative', overflow:'hidden', fontFamily:"'Inter',Arial,sans-serif" }}>
       <style>{AUTH_CSS}</style>
 
       {FLOATERS.map(({ e, size, anim, dur, delay, ...pos }: any, i) => (
@@ -95,7 +95,7 @@ function LoginPage() {
           <a href="/signup" className="auth-link" style={{ color:'#1FA873', fontWeight:700, textDecoration:'none' }}>Create a free account</a>
         </p>
       </div>
-    </div>
+    </main>
   );
 }
 export default LoginPage;
