@@ -62,7 +62,7 @@ function SignUpPage() {
         <div style={{ textAlign:'center', marginBottom:28 }}>
           <div style={{ width:64, height:64, borderRadius:20, background:'linear-gradient(135deg,#1FA873,#0F6E56)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:30, margin:'0 auto 16px', boxShadow:'0 8px 24px rgba(31,168,115,.3)' }}>✨</div>
           <h1 style={{ fontSize:24, fontWeight:800, color:'#2D2A26', margin:'0 0 4px', letterSpacing:'-0.5px' }}>Create account</h1>
-          <p style={{ fontSize:13, color:'#aaa', margin:0 }}>Free forever — no credit card needed</p>
+          <p style={{ fontSize:13, color:'#aaa', margin:0 }}>No subscription required to get started</p>
         </div>
 
         {error   && <div style={{ background:'#FDF0EE', border:'1px solid #DC4C3F', color:'#c24337',   borderRadius:14, padding:'12px 16px', fontSize:13, marginBottom:16, animation:'slideDown .3s ease' }}>{error}</div>}

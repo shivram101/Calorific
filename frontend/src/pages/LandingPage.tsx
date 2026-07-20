@@ -40,14 +40,14 @@ function LandingPage() {
     { icon:'📊', title:'Deep nutrition data',   desc:'60+ micronutrients tracked across vitamins, minerals, amino acids, and more.' },
     { icon:'📈', title:'Beautiful trends',      desc:'Weight charts, logging streaks, and calorie adherence over 7, 30, or 90 days.' },
     { icon:'💧', title:'Hydration tracking',    desc:'Set a daily water goal and log with one tap. Animated glass fills as you drink.' },
-    { icon:'🆓', title:'Completely free',       desc:'No subscription. No ads. No paywalls. Just the tool you need.' },
+    { icon:'🆓', title:'No subscription',        desc:'No paywalls, no premium tiers, no ads. Just the tool you need.' },
   ];
 
   const stats = [
     { num:'400K+', label:'Foods in database' },
     { num:'60+',   label:'Micronutrients tracked' },
     { num:'3',     label:'Platforms — iOS, Android, Web' },
-    { num:'$0',    label:'Forever free' },
+    { num:'$0',    label:'Free to use' },
   ];
 
   return (
@@ -72,7 +72,7 @@ function LandingPage() {
 
         <div style={{ animation:'fadeInUp 0.6s ease both', animationDelay:'0.1s' }}>
           <div style={{ display:'inline-flex', alignItems:'center', gap:6, background:'linear-gradient(135deg,#E1F5EE,#C8EFE1)', color:'#0F6E56', fontSize:12, fontWeight:700, padding:'6px 14px', borderRadius:20, marginBottom:24, letterSpacing:0.5 }}>
-            🌱 Free forever · No credit card required
+            🌱 No subscription · No paywalls
           </div>
         </div>
 
@@ -127,7 +127,7 @@ function LandingPage() {
       {/* CTA BANNER */}
       <div style={{ background:'linear-gradient(135deg,#1FA873,#0F6E56)', padding:'64px 5%', textAlign:'center' }}>
         <h2 style={{ fontSize:'clamp(24px,4vw,40px)', fontWeight:800, color:'#fff', margin:'0 0 12px', letterSpacing:'-1px' }}>Ready to start?</h2>
-        <p style={{ fontSize:15, color:'rgba(255,255,255,.8)', marginBottom:32 }}>It's free. It's fast. No credit card needed.</p>
+        <p style={{ fontSize:15, color:'rgba(255,255,255,.8)', marginBottom:32 }}>No subscription required. Get started in seconds.</p>
         <a href="/signup" style={{ display:'inline-block', padding:'16px 48px', borderRadius:16, fontSize:15, fontWeight:700, color:'#1FA873', textDecoration:'none', background:'#fff', boxShadow:'0 8px 24px rgba(0,0,0,.2)', transition:'all .2s' }}>
           Create your free account →
         </a>
