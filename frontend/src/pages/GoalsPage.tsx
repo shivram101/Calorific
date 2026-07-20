@@ -43,7 +43,11 @@ function GoalsPage() {
   const [loading,          setLoading]           = useState(true);
   const [error,            setError]             = useState('');
   const [suggestedLoading, setSuggestedLoading]  = useState(false);
-  const [waterTarget,      setWaterTarget]       = useState(() => Number(localStorage.getItem('calorific_water_target')) || 2000);
+  const [waterTarget,      setWaterTarget]       = useState(() => {
+    // Legacy values: old Goals page stored raw numbers (e.g. "4" = 4 L) as ml.
+    const v = Number(localStorage.getItem('calorific_water_target')) || 2000;
+    return v > 0 && v < 100 ? Math.round(v * 1000) : v;
+  });
   const [waterTodayMl,     setWaterTodayMl]      = useState(0);
   const [waterInput,       setWaterInput]        = useState('');
   const [waterUnit,        setWaterUnit]         = useState<'L'|'gal'>(() =>

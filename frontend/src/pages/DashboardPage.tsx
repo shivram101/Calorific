@@ -24,15 +24,19 @@ function DashboardPage() {
   const [totals,       setTotals]       = useState({ calories:0, protein:0, fat:0, carbs:0 });
   const [diaryLoading, setDiaryLoading] = useState(true);
 
-  const [WATER_GOAL_ML, setWATER_GOAL_ML] = useState(() =>
-    Number(localStorage.getItem('calorific_water_target')) || 2000
-  );
+  // An older Goals page stored the raw typed number (e.g. "4" meaning 4 L)
+  // instead of ml. Treat legacy values under 100 as litres and convert.
+  const readWaterTarget = () => {
+    const v = Number(localStorage.getItem('calorific_water_target')) || 2000;
+    return v > 0 && v < 100 ? Math.round(v * 1000) : v;
+  };
+  const [WATER_GOAL_ML, setWATER_GOAL_ML] = useState(readWaterTarget);
   const [waterUnit, setWaterUnit] = useState<'L'|'gal'>(() =>
     (localStorage.getItem('calorific_water_unit') as 'L'|'gal') || 'L'
   );
   useEffect(() => {
     const sync = () => {
-      setWATER_GOAL_ML(Number(localStorage.getItem('calorific_water_target')) || 2000);
+      setWATER_GOAL_ML(readWaterTarget());
       setWaterUnit((localStorage.getItem('calorific_water_unit') as 'L'|'gal') || 'L');
     };
     window.addEventListener('focus', sync);
