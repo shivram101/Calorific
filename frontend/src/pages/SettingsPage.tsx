@@ -1,448 +1,281 @@
 // src/pages/SettingsPage.tsx
-// Uses the centralized API client (getProfile / updateProfile / deleteAccount / logout).
-// Backend field names: heightCm, weightKg, age (number), goal is lowercase 'lose'|'maintain'|'gain'.
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, updateProfile, deleteAccount, logout } from '../api/client';
+import { getProfile, updateProfile, deleteAccount, logout, getStoredFirstName } from '../api/client';
+import { PAGE_CSS } from './PAGE_CSS';
 
 type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
 type UnitSystem = 'metric' | 'us';
 
-const GOAL_OPTIONS: { value: GoalType; label: string; sub: string; icon: string }[] = [
-  { value: 'lose',     label: 'Lose weight',   sub: '−500 kcal/day deficit',      icon: '🔻' },
-  { value: 'maintain', label: 'Maintain',       sub: 'Keep current weight',         icon: '⚖️' },
-  { value: 'build',    label: 'Build muscle',   sub: '+200 kcal, high protein',     icon: '💪' },
-  { value: 'gain',     label: 'Gain weight',    sub: '+400 kcal/day surplus',       icon: '📈' },
+const GOAL_OPTIONS = [
+  { value:'lose'     as GoalType, label:'Lose weight',  sub:'−500 kcal/day', icon:'🔻', color:'#DC4C3F' },
+  { value:'maintain' as GoalType, label:'Maintain',      sub:'Hold steady',   icon:'⚖️', color:'#EF9F27' },
+  { value:'build'    as GoalType, label:'Build muscle',  sub:'+200 kcal',     icon:'💪', color:'#1FA873' },
+  { value:'gain'     as GoalType, label:'Gain weight',   sub:'+400 kcal',     icon:'📈', color:'#378ADD' },
 ];
 
-const KG_TO_LBS = 2.20462;
-const CM_PER_INCH = 2.54;
+const ACTIVITY_OPTIONS = [
+  { value:'sedentary',  label:'Sedentary',     icon:'🛋️' },
+  { value:'light',      label:'Light',          icon:'🚶' },
+  { value:'moderate',   label:'Moderate',       icon:'🏃' },
+  { value:'active',     label:'Active',         icon:'⚡' },
+  { value:'veryActive', label:'Very active',    icon:'🏆' },
+];
 
-function cmToFtIn(cm: number) {
-  const totalIn = cm / CM_PER_INCH;
-  return { ft: Math.floor(totalIn / 12), inch: Math.round(totalIn % 12) };
-}
-function ftInToCm(ft: number, inch: number) {
-  return Math.round((ft * 12 + inch) * CM_PER_INCH);
-}
-function kgToLbs(kg: number) { return Math.round(kg * KG_TO_LBS * 10) / 10; }
-function lbsToKg(lbs: number) { return Math.round((lbs / KG_TO_LBS) * 10) / 10; }
+const KG_TO_LBS = 2.20462, CM_PER_INCH = 2.54;
+function cmToFtIn(cm:number) { const t=cm/CM_PER_INCH; return { ft:Math.floor(t/12), inch:Math.round(t%12) }; }
+function ftInToCm(ft:number,inch:number) { return Math.round((ft*12+inch)*CM_PER_INCH); }
+function kgToLbs(kg:number) { return Math.round(kg*KG_TO_LBS*10)/10; }
+function lbsToKg(lbs:number) { return Math.round((lbs/KG_TO_LBS)*10)/10; }
 
 function SettingsPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [age, setAge] = useState('');
-  const [heightCmRaw, setHeightCmRaw] = useState('');   // always cm internally
-  const [weightKgRaw, setWeightKgRaw] = useState('');   // always kg internally
-  // Display fields — change with unit system
-  const [heightFt, setHeightFt] = useState('');
-  const [heightIn, setHeightIn] = useState('');
-  const [weightDisplay, setWeightDisplay] = useState('');
-  const [unitSystem, setUnitSystem] = useState<UnitSystem>(
-    () => (localStorage.getItem('calorific_units') as UnitSystem) || 'us'
-  );
-  const [activityLevel, setActivityLevel] = useState('');
-  const [goal, setGoal] = useState<GoalType | ''>('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [email,        setEmail]        = useState('');
+  const [isVerified,   setIsVerified]   = useState(false);
+  const [firstName,    setFirstName]    = useState('');
+  const [lastName,     setLastName]     = useState('');
+  const [age,          setAge]          = useState('');
+  const [heightCmRaw,  setHeightCmRaw]  = useState('');
+  const [weightKgRaw,  setWeightKgRaw]  = useState('');
+  const [heightFt,     setHeightFt]     = useState('');
+  const [heightIn,     setHeightIn]     = useState('');
+  const [weightDisplay,setWeightDisplay]= useState('');
+  const [unitSystem,   setUnitSystem]   = useState<UnitSystem>(() => (localStorage.getItem('calorific_units') as UnitSystem)||'us');
+  const [activityLevel,setActivityLevel]= useState('');
+  const [goal,         setGoal]         = useState<GoalType|''>('');
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
+  const [message,      setMessage]      = useState('');
+  const [error,        setError]        = useState('');
 
   useEffect(() => {
-    getProfile()
-      .then(data => {
-        setEmail(data.email || '');
-        setIsVerified(!!data.isVerified);
-        setFirstName(data.firstName || '');
-        setLastName(data.lastName || '');
-        setAge(data.age != null ? String(data.age) : '');
-        setActivityLevel(data.activityLevel || '');
-        setGoal((data.goal as GoalType) || '');
-
-        const cm = data.heightCm ?? 0;
-        const kg = data.weightKg ?? 0;
-        setHeightCmRaw(cm ? String(cm) : '');
-        setWeightKgRaw(kg ? String(kg) : '');
-
-        if (unitSystem === 'us') {
-          if (cm) { const { ft, inch } = cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); }
-          if (kg) setWeightDisplay(String(kgToLbs(kg)));
-        } else {
-          if (cm) setHeightFt(String(cm));
-          if (kg) setWeightDisplay(String(kg));
-        }
-      })
-      .catch((err: any) => {
-        if (err.message?.includes('Invalid or expired token')) logout();
-        else setError('Could not load profile.');
-      })
-      .finally(() => setLoading(false));
+    getProfile().then(data => {
+      setEmail(data.email||''); setIsVerified(!!data.isVerified);
+      setFirstName(data.firstName||''); setLastName(data.lastName||'');
+      setAge(data.age!=null?String(data.age):'');
+      setActivityLevel(data.activityLevel||''); setGoal((data.goal as GoalType)||'');
+      const cm=data.heightCm??0, kg=data.weightKg??0;
+      setHeightCmRaw(cm?String(cm):''); setWeightKgRaw(kg?String(kg):'');
+      if (unitSystem==='us') {
+        if (cm) { const {ft,inch}=cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); }
+        if (kg) setWeightDisplay(String(kgToLbs(kg)));
+      } else {
+        if (cm) setHeightFt(String(cm));
+        if (kg) setWeightDisplay(String(kg));
+      }
+    }).catch((err:any) => {
+      if (err.message?.includes('Invalid or expired token')) logout();
+      else setError('Could not load profile.');
+    }).finally(() => setLoading(false));
   }, []);
 
-  function switchUnitSystem(u: UnitSystem) {
-    setUnitSystem(u);
-    localStorage.setItem('calorific_units', u);
-    const cm = Number(heightCmRaw);
-    const kg = Number(weightKgRaw);
-    if (u === 'us') {
-      if (cm) { const { ft, inch } = cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); }
-      else { setHeightFt(''); setHeightIn(''); }
-      setWeightDisplay(kg ? String(kgToLbs(kg)) : '');
+  function switchUnit(u:UnitSystem) {
+    setUnitSystem(u); localStorage.setItem('calorific_units',u);
+    const cm=Number(heightCmRaw), kg=Number(weightKgRaw);
+    if (u==='us') {
+      if (cm) { const {ft,inch}=cmToFtIn(cm); setHeightFt(String(ft)); setHeightIn(String(inch)); } else { setHeightFt(''); setHeightIn(''); }
+      setWeightDisplay(kg?String(kgToLbs(kg)):'');
     } else {
-      setHeightFt(cm ? String(cm) : '');
-      setHeightIn('');
-      setWeightDisplay(kg ? String(kg) : '');
+      setHeightFt(cm?String(cm):''); setHeightIn('');
+      setWeightDisplay(kg?String(kg):'');
     }
   }
 
   async function handleSave() {
-    setSaving(true);
-    setMessage('');
-    setError('');
+    setSaving(true); setMessage(''); setError('');
     try {
-      // Convert display values back to metric for storage
-      let finalHeightCm: number | null = null;
-      let finalWeightKg: number | null = null;
-      if (unitSystem === 'us') {
-        const ft = Number(heightFt), inch = Number(heightIn || 0);
-        if (ft || inch) { finalHeightCm = ftInToCm(ft, inch); setHeightCmRaw(String(finalHeightCm)); }
-        const lbs = Number(weightDisplay);
-        if (lbs) { finalWeightKg = lbsToKg(lbs); setWeightKgRaw(String(finalWeightKg)); }
+      let finalHeightCm:number|null=null, finalWeightKg:number|null=null;
+      if (unitSystem==='us') {
+        const ft=Number(heightFt),inch=Number(heightIn||0);
+        if (ft||inch) { finalHeightCm=ftInToCm(ft,inch); setHeightCmRaw(String(finalHeightCm)); }
+        const lbs=Number(weightDisplay);
+        if (lbs) { finalWeightKg=lbsToKg(lbs); setWeightKgRaw(String(finalWeightKg)); }
       } else {
-        const cm = Number(heightFt);
-        if (cm) { finalHeightCm = cm; setHeightCmRaw(String(cm)); }
-        const kg = Number(weightDisplay);
-        if (kg) { finalWeightKg = kg; setWeightKgRaw(String(kg)); }
+        const cm=Number(heightFt); if (cm) { finalHeightCm=cm; setHeightCmRaw(String(cm)); }
+        const kg=Number(weightDisplay); if (kg) { finalWeightKg=kg; setWeightKgRaw(String(kg)); }
       }
-      await updateProfile({
-        firstName, lastName,
-        age: age !== '' ? Number(age) : null,
-        heightCm: finalHeightCm,
-        weightKg: finalWeightKg,
-        activityLevel: activityLevel || null,
-        goal: goal || null,
-      });
+      await updateProfile({ firstName, lastName, age:age!==''?Number(age):null, heightCm:finalHeightCm, weightKg:finalWeightKg, activityLevel:activityLevel||null, goal:goal||null });
       setMessage('Changes saved!');
-    } catch (err: any) {
-      setError(err.message || 'Could not save changes.');
-    } finally {
-      setSaving(false);
-    }
+    } catch (err:any) { setError(err.message||'Could not save changes.'); }
+    finally { setSaving(false); }
   }
 
-  async function handleDeleteAccount() {
-    const confirmed = window.confirm(
-      'Delete your account? This permanently removes your profile, food logs, water logs, weight history, and targets. This cannot be undone.'
-    );
-    if (!confirmed) return;
+  async function handleDelete() {
+    if (!window.confirm('Delete your account? This permanently removes everything and cannot be undone.')) return;
     setDeleting(true);
-    setError('');
-    try {
-      await deleteAccount();
-      logout(); // clears token and redirects to /login
-    } catch (err: any) {
-      setError(err.message || 'Could not delete account.');
-      setDeleting(false);
-    }
+    try { await deleteAccount(); logout(); }
+    catch (err:any) { setError(err.message||'Could not delete account.'); setDeleting(false); }
   }
 
-  const cardStyle = {
-    background: '#ffffff',
-    borderRadius: '20px',
-    padding: '24px',
-    marginBottom: '20px',
-    boxShadow: '0 6px 20px rgba(0,0,0,0.05)',
-  };
+  const inp:any = { width:'100%', padding:'12px 14px', borderRadius:12, border:'1.5px solid transparent', background:'#F8F5F0', fontSize:13, color:'#2D2A26', fontFamily:'inherit', boxSizing:'border-box', transition:'border-color .2s, box-shadow .2s' };
+  const sel:any = { ...inp };
 
-  const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 500, color: '#2D2A26', marginBottom: '6px' };
+  if (loading) return (
+    <div style={{ minHeight:'100vh', background:'#FFF8ED', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', gap:16 }}>
+      <style>{PAGE_CSS}</style>
+      <div className="skeleton ani-pulse" style={{ width:320, height:200, borderRadius:20 }} />
+      <p style={{ color:'#aaa', fontSize:13 }}>Loading settings…</p>
+    </div>
+  );
 
-  const inputStyle = {
-    width: '100%',
-    background: '#FFF8ED',
-    border: '1px solid transparent',
-    borderRadius: '12px',
-    padding: '11px 14px',
-    fontSize: '13px',
-    color: '#2D2A26',
-    outline: 'none',
-    boxSizing: 'border-box' as const,
-  };
-
-  const tileStyle = (active: boolean) => ({
-    flex: 1,
-    padding: '14px 8px',
-    borderRadius: '14px',
-    textAlign: 'center' as const,
-    cursor: 'pointer',
-    background: active ? '#188159' : '#FFF8ED',
-  });
-
-  const tileLabelStyle = (active: boolean) => ({
-    fontSize: '12px',
-    fontWeight: 600,
-    color: active ? '#fff' : '#2D2A26',
-    marginTop: '4px',
-  });
-
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#FFF8ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#777167', fontSize: '13px' }}>Loading settings...</p>
+  const section = (title:string, subtitle:string, icon:string, children:any, delay='0s') => (
+    <div className="p-card ani-fadeInUp" style={{ background:'#fff', borderRadius:20, padding:24, boxShadow:'0 12px 32px rgba(0,0,0,0.08)', animationDelay:delay }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20, paddingBottom:16, borderBottom:'1px solid #F5F2EE' }}>
+        <div style={{ width:40, height:40, borderRadius:12, background:'#F0FBF6', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>{icon}</div>
+        <div>
+          <div style={{ fontWeight:700, fontSize:15, color:'#2D2A26' }}>{title}</div>
+          <div style={{ fontSize:12, color:'#aaa', marginTop:1 }}>{subtitle}</div>
+        </div>
       </div>
-    );
-  }
+      {children}
+    </div>
+  );
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#FFF8ED', padding: '32px 24px' }}>
+    <div className="inner-page" style={{ minHeight:'100vh', background:'linear-gradient(160deg,#FFF8ED 0%,#F5FBF8 100%)', padding:'16px 20px', fontFamily:"'Inter',Arial,sans-serif", display:'flex', flexDirection:'column', gap:16 }}>
+      <style>{PAGE_CSS}</style>
+
       {/* NAVBAR */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', padding: '12px 18px', borderRadius: 12, boxShadow: '0 6px 16px rgba(0,0,0,0.05)', marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: '#2D2A26' }}>Calorific</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>Log</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/goals')}>Goals</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#77746e', cursor: 'pointer' }} onClick={() => navigate('/progress')}>Trends</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#2D2A26', cursor: 'pointer', borderBottom: '2px solid #188159', paddingBottom: 2 }}>Settings</div>
+      <nav className="page-nav ani-fadeInUp" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', background:'rgba(255,255,255,0.85)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', padding:'12px 20px', borderRadius:16, boxShadow:'0 8px 32px rgba(0,0,0,0.07)', border:'1px solid rgba(255,255,255,.8)', position:'sticky', top:0, zIndex:100 }}>
+        <div style={{ display:'flex', gap:24, alignItems:'center' }}>
+          <span style={{ fontWeight:800, fontSize:16, color:'#1FA873', letterSpacing:'-0.5px' }}>Calorific.</span>
+          {[['Log','/Dashboard'],['Goals','/goals'],['Trends','/progress'],['Settings',null]].map(([label,path]) => (
+            <span key={label} className="nav-link" style={{ fontSize:13, fontWeight:600, color:label==='Settings'?'#2D2A26':'#77746e', borderBottom:label==='Settings'?'2px solid #1FA873':'none', paddingBottom:label==='Settings'?2:0 }}
+              onClick={() => path && navigate(path)}>{label}</span>
+          ))}
         </div>
-        <button style={{ background: '#c24337', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 13 }} onClick={logout}>Logout</button>
-      </div>
-      <div style={{ maxWidth: '520px', margin: '0 auto' }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '28px' }}>
-          <a href="/dashboard" style={{ fontSize: '18px', color: '#2D2A26', textDecoration: 'none' }} aria-label="Back to dashboard">
-            <i className="ti ti-arrow-left" aria-hidden="true"></i>
-          </a>
-          <h1 style={{ fontSize: '20px', fontWeight: 600, color: '#2D2A26', margin: 0 }}>Settings</h1>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:12, color:'#2D2A26', background:'linear-gradient(135deg,#FFF8ED,#F5EFE0)', padding:'6px 12px', borderRadius:20, fontWeight:500 }}>👋 {getStoredFirstName()||'there'}</span>
+          <button className="p-btn" onClick={logout} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
         </div>
+      </nav>
 
-        {message && (
-          <div style={{ background: '#E1F5EE', border: '1px solid #188159', color: '#0F6E56', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
-            {message}
-          </div>
-        )}
-        {error && (
-          <div style={{ background: '#FDF0EE', border: '1px solid #DC4C3F', color: '#c24337', borderRadius: '12px', padding: '12px 16px', fontSize: '13px', marginBottom: '18px' }}>
-            {error}
-          </div>
-        )}
-
-        {/* Account */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Account</div>
-          <div style={{ background: '#FFF8ED', borderRadius: '12px', padding: '11px 14px', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <i className="ti ti-mail" style={{ fontSize: '15px', color: '#b5ac9d' }} aria-hidden="true"></i>
-            <span style={{ fontSize: '13px', color: '#2D2A26' }}>{email}</span>
-          </div>
-          {isVerified ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#188159', fontWeight: 500 }}>
-              <i className="ti ti-circle-check" aria-hidden="true"></i>
-              Email verified
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#c24337', fontWeight: 500 }}>
-              <i className="ti ti-alert-circle" aria-hidden="true"></i>
-              Email not verified — check your inbox
-            </div>
-          )}
+      {/* HEADER + SAVE */}
+      <div className="ani-fadeInUp" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', animationDelay:'0.05s' }}>
+        <div>
+          <h1 style={{ margin:0, fontSize:24, fontWeight:900, color:'#2D2A26', letterSpacing:'-0.5px' }}>Settings</h1>
+          <p style={{ margin:'4px 0 0', fontSize:13, color:'#aaa' }}>Manage your profile, biometrics, and preferences</p>
         </div>
-
-        {/* Profile */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Profile</div>
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="settings-first-name">First name</label>
-              <input id="settings-first-name" style={inputStyle} value={firstName} onChange={e => setFirstName(e.target.value)} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="settings-last-name">Last name</label>
-              <input id="settings-last-name" style={inputStyle} value={lastName} onChange={e => setLastName(e.target.value)} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle} htmlFor="settings-age">Age</label>
-              <input id="settings-age" type="number" style={inputStyle} value={age} onChange={e => setAge(e.target.value)} />
-            </div>
-          </div>
-
-          {/* Unit system toggle */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14, background: '#FFF8ED', borderRadius: 12, padding: 4 }}>
-            {(['metric', 'us'] as UnitSystem[]).map(u => (
-              <button key={u} onClick={() => switchUnitSystem(u)}
-                style={{ flex: 1, padding: '8px', borderRadius: 10, border: 'none', fontWeight: 600, fontSize: 12, cursor: 'pointer',
-                  background: unitSystem === u ? '#188159' : 'transparent',
-                  color: unitSystem === u ? '#fff' : '#777167' }}>
-                {u === 'us' ? '🇺🇸 US (lbs, ft/in)' : '📏 Metric (kg, cm)'}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-            {unitSystem === 'us' ? (
-              <>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Height (ft)</label>
-                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 5" aria-label="Height in feet" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Height (in)</label>
-                  <input type="number" style={inputStyle} value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="e.g. 10" aria-label="Height in inches" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Weight (lbs)</label>
-                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 160" aria-label="Weight in pounds" />
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Height (cm)</label>
-                  <input type="number" style={inputStyle} value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="e.g. 175" aria-label="Height in centimeters" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Weight (kg)</label>
-                  <input type="number" style={inputStyle} value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder="e.g. 70" aria-label="Weight in kilograms" />
-                </div>
-              </>
-            )}
-          </div>
-
-        </div>
-
-        {/* Activity level */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Activity level</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {[
-              { label: 'Sedentary', icon: 'ti-sofa' },
-              { label: 'Lightly active', icon: 'ti-walk' },
-              { label: 'Active', icon: 'ti-run' },
-              { label: 'Very active', icon: 'ti-barbell' },
-            ].map(({ label, icon }) => (
-              <div
-                key={label}
-                onClick={() => setActivityLevel(label)}
-                style={{
-                  flex: '1 1 45%',
-                  padding: '12px 10px',
-                  borderRadius: '12px',
-                  textAlign: 'center',
-                  cursor: 'pointer',
-                  background: activityLevel === label ? '#188159' : '#FFF8ED',
-                  color: activityLevel === label ? '#fff' : '#2D2A26',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                }}
-              >
-                <i className={`ti ${icon}`} aria-hidden="true"></i>
-                {label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Goal */}
-        <div style={cardStyle}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#2D2A26', marginBottom: '14px' }}>Goal</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-            {GOAL_OPTIONS.map(({ value, label, sub, icon }) => (
-              <div key={value} onClick={() => setGoal(value)}
-                style={{
-                  flex: '1 1 45%', padding: '14px 12px', borderRadius: '14px', cursor: 'pointer',
-                  background: goal === value ? '#188159' : '#FFF8ED',
-                  border: goal === value ? '2px solid #188159' : '2px solid transparent',
-                }}>
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: goal === value ? '#fff' : '#2D2A26' }}>{label}</div>
-                <div style={{ fontSize: 11, color: goal === value ? 'rgba(255,255,255,0.8)' : '#777167', marginTop: 2 }}>{sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Actions */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{
-            width: '100%',
-            background: '#188159',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '14px',
-            padding: '13px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 6px 16px rgba(31,168,115,0.3)',
-            marginBottom: '12px',
-          }}
-        >
-          {saving ? 'Saving...' : 'Save changes'}
-        </button>
-
-        <button
-          onClick={() => logout()}
-          style={{
-            width: '100%',
-            background: '#ffffff',
-            color: '#2D2A26',
-            border: '1px solid #E3E8E5',
-            borderRadius: '14px',
-            padding: '13px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            marginBottom: '28px',
-          }}
-        >
-          <i className="ti ti-logout" aria-hidden="true"></i>
-          Log out
-        </button>
-
-        {/* Danger zone */}
-        <div style={{ ...cardStyle, border: '1px solid #F3D9D5' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#c24337', marginBottom: '6px' }}>Danger zone</div>
-          <p style={{ fontSize: '12px', color: '#777167', margin: '0 0 14px 0', lineHeight: 1.5 }}>
-            Permanently delete your account and all logged data. This cannot be undone.
-          </p>
-          <button
-            onClick={handleDeleteAccount}
-            disabled={deleting}
-            style={{
-              width: '100%',
-              background: '#FDF0EE',
-              color: '#c24337',
-              border: '1px solid #DC4C3F',
-              borderRadius: '14px',
-              padding: '13px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {deleting ? 'Deleting...' : 'Delete account'}
+        <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+          {message && <span className="ani-bounceIn" style={{ fontSize:13, fontWeight:700, color:'#188159', background:'#F0FBF6', padding:'6px 14px', borderRadius:20 }}>✓ {message}</span>}
+          {error && <span className="ani-slideDown" style={{ fontSize:13, color:'#c24337' }}>{error}</span>}
+          <button className="p-btn" onClick={handleSave} disabled={saving}
+            style={{ background:'linear-gradient(135deg,#1FA873,#188159)', color:'#fff', border:'none', borderRadius:14, padding:'11px 24px', fontSize:14, fontWeight:700, boxShadow:'0 6px 20px rgba(31,168,115,.35)' }}>
+            {saving ? '⏳ Saving…' : 'Save changes'}
           </button>
         </div>
+      </div>
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }} className="two-col">
+
+        {/* Profile */}
+        {section('Profile', 'Your name and email', '👤', (
+          <>
+            <div style={{ background:'#F0FBF6', borderRadius:12, padding:'12px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
+              <span style={{ fontSize:16 }}>{isVerified?'✅':'⚠️'}</span>
+              <span style={{ color:isVerified?'#0F6E56':'#8A6000', fontWeight:600 }}>{email}</span>
+              {!isVerified && <span style={{ fontSize:11, color:'#aaa' }}>· Unverified</span>}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {[['First name', firstName, setFirstName, 'Shivram'],['Last name', lastName, setLastName, 'Sundar']].map(([label, val, set, ph]:any) => (
+                <div key={label as string}>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>{label}</label>
+                  <input className="p-input" value={val} onChange={(e:any) => set(e.target.value)} placeholder={ph} style={inp} />
+                </div>
+              ))}
+            </div>
+          </>
+        ), '0.1s')}
+
+        {/* Biometrics */}
+        {section('Biometrics', 'Used to calculate your calorie targets', '📏', (
+          <>
+            {/* Unit toggle */}
+            <div style={{ display:'flex', background:'#F5F2EE', borderRadius:12, padding:4, marginBottom:16 }}>
+              {([['us','🇺🇸 US (lbs, ft/in)'],['metric','📏 Metric (kg, cm)']] as [UnitSystem,string][]).map(([u,label]) => (
+                <button key={u} onClick={() => switchUnit(u)} style={{ flex:1, padding:'9px', borderRadius:10, border:'none', fontWeight:700, fontSize:12, cursor:'pointer', transition:'all .2s', background:unitSystem===u?'#1FA873':'transparent', color:unitSystem===u?'#fff':'#777167', boxShadow:unitSystem===u?'0 4px 12px rgba(31,168,115,.3)':'' }}>{label}</button>
+              ))}
+            </div>
+
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>Age</label>
+                <input className="p-input" type="number" value={age} onChange={e => setAge(e.target.value)} placeholder="22" style={inp} />
+              </div>
+              {unitSystem==='us' ? (
+                <>
+                  <div>
+                    <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>Height (ft)</label>
+                    <input className="p-input" type="number" value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="5" style={inp} />
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>Height (cm)</label>
+                  <input className="p-input" type="number" value={heightFt} onChange={e => setHeightFt(e.target.value)} placeholder="175" style={inp} />
+                </div>
+              )}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              {unitSystem==='us' && (
+                <div>
+                  <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>Height (in)</label>
+                  <input className="p-input" type="number" value={heightIn} onChange={e => setHeightIn(e.target.value)} placeholder="10" style={inp} />
+                </div>
+              )}
+              <div>
+                <label style={{ display:'block', fontSize:12, fontWeight:600, color:'#2D2A26', marginBottom:6 }}>Weight ({unitSystem==='us'?'lbs':'kg'})</label>
+                <input className="p-input" type="number" step="0.1" value={weightDisplay} onChange={e => setWeightDisplay(e.target.value)} placeholder={unitSystem==='us'?'160':'72'} style={inp} />
+              </div>
+            </div>
+          </>
+        ), '0.15s')}
+
+        {/* Activity */}
+        {section('Activity level', 'How active are you on a typical week?', '⚡', (
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {ACTIVITY_OPTIONS.map(({ value, label, icon }) => (
+              <div key={value} className="opt-tile" onClick={() => setActivityLevel(value)}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:`2px solid ${activityLevel===value?'#1FA873':'#F0EDE8'}`, background:activityLevel===value?'#F0FBF6':'#FAFAFA', transition:'all .2s' }}>
+                <span style={{ fontSize:18 }}>{icon}</span>
+                <span style={{ fontSize:13, fontWeight:600, color:activityLevel===value?'#188159':'#2D2A26', flex:1 }}>{label}</span>
+                {activityLevel===value && <span style={{ color:'#1FA873', fontWeight:700 }}>✓</span>}
+              </div>
+            ))}
+          </div>
+        ), '0.2s')}
+
+        {/* Goal */}
+        {section('Goal', 'What are you working toward?', '🎯', (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {GOAL_OPTIONS.map(({ value, label, sub, icon, color }) => (
+              <div key={value} className="opt-tile" onClick={() => setGoal(value)}
+                style={{ padding:'16px 12px', borderRadius:16, border:`2px solid ${goal===value?color:'#F0EDE8'}`, background:goal===value?`${color}12`:'#FAFAFA', textAlign:'center', transition:'all .2s' }}>
+                <span style={{ fontSize:24, display:'block', marginBottom:6 }}>{icon}</span>
+                <span style={{ display:'block', fontWeight:700, fontSize:13, color:goal===value?color:'#2D2A26' }}>{label}</span>
+                <span style={{ display:'block', fontSize:11, color:'#bbb', marginTop:3 }}>{sub}</span>
+              </div>
+            ))}
+          </div>
+        ), '0.25s')}
+      </div>
+
+      {/* Danger zone */}
+      <div className="p-card ani-fadeInUp" style={{ background:'#fff', borderRadius:20, padding:24, boxShadow:'0 12px 32px rgba(0,0,0,0.08)', border:'1.5px solid #FDF0EE', animationDelay:'0.3s' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+          <div style={{ width:40, height:40, borderRadius:12, background:'#FDF0EE', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>⚠️</div>
+          <div>
+            <div style={{ fontWeight:700, fontSize:15, color:'#c24337' }}>Danger zone</div>
+            <div style={{ fontSize:12, color:'#aaa', marginTop:1 }}>Permanent actions that cannot be undone</div>
+          </div>
+        </div>
+        <button onClick={handleDelete} disabled={deleting} className="p-btn"
+          style={{ padding:'13px 24px', background:'#FDF0EE', color:'#c24337', border:'1.5px solid #DC4C3F', borderRadius:14, fontWeight:700, fontSize:14, cursor:'pointer' }}>
+          {deleting ? 'Deleting…' : '🗑 Delete my account'}
+        </button>
       </div>
     </div>
   );
 }
-
 export default SettingsPage;

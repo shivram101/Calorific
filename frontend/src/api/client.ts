@@ -216,8 +216,6 @@ export async function getFoodDetail(id: string): Promise<Food> {
   return request<Food>('GET', `/foods/${id}`);
 }
 
-
-
 // ─── Micronutrients ───────────────────────────────────────────────────────────
 
 export interface MicronutrientEntry {
@@ -314,6 +312,10 @@ export async function getWater(date: string): Promise<DailyWater> {
 
 export async function addWater(amountMl: number, date: string): Promise<DailyWater> {
   return request<DailyWater>('POST', '/water', { body: { amountMl, date } });
+}
+
+export async function deleteWater(id: string): Promise<{ message: string }> {
+  return request<{ message: string }>('DELETE', `/water/${id}`);
 }
 
 // ─── Targets ──────────────────────────────────────────────────────────────────
