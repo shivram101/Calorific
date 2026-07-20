@@ -3,7 +3,7 @@
 // so VerifyEmailPage can read the token via useParams() instead of useSearchParams().
 // This matches the API endpoint: GET /api/verify-email/:token
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { getToken } from './api/client';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -23,6 +23,18 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
   return getToken() ? children : <Navigate to="/login" replace />;
 }
 
+// Catch-all for unmatched URLs. Email links can arrive with duplicate slashes
+// (e.g. a CLIENT_URL with a trailing slash produces domain//verify-email/...),
+// which would otherwise render a blank page. Collapse the slashes and retry;
+// anything else goes to the landing page.
+function CatchAll() {
+  const { pathname, search } = useLocation();
+  if (/\/{2,}/.test(pathname)) {
+    return <Navigate to={pathname.replace(/\/{2,}/g, '/') + search} replace />;
+  }
+  return <Navigate to="/" replace />;
+}
+
 function App() {
   return (
     <Router>
@@ -38,6 +50,7 @@ function App() {
         <Route path="/goals" element={<RequireAuth><GoalsPage /></RequireAuth>} />
         <Route path="/progress" element={<RequireAuth><ProgressPage /></RequireAuth>} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+        <Route path="*" element={<CatchAll />} />
       </Routes>
     </Router>
   );
