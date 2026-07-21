@@ -43,7 +43,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // First login → onboarding if profile incomplete
-      if (profile.heightCm == null || profile.weightKg == null || profile.goal == null) {
+      if (profile.heightCm == null ||
+          profile.weightKg == null ||
+          profile.goal == null) {
         Navigator.pushReplacementNamed(context, '/onboarding');
       } else {
         Navigator.pushReplacementNamed(context, '/diary');
@@ -83,7 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Welcome badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: CalorificColors.greenLight,
                     borderRadius: BorderRadius.circular(20),
@@ -278,7 +281,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pushNamed(context, '/signup'),
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/signup'),
                             child: const Text(
                               'Sign up',
                               style: TextStyle(

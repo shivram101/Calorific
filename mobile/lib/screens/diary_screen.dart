@@ -14,8 +14,7 @@ class DiaryScreen extends StatefulWidget {
   State<DiaryScreen> createState() => _DiaryScreenState();
 }
 
-class _DiaryScreenState extends State<DiaryScreen>
-    with WidgetsBindingObserver {
+class _DiaryScreenState extends State<DiaryScreen> with WidgetsBindingObserver {
   DailyLog? _log;
   double _waterMl = 0;
   List<WaterEntry> _waterEntries = [];
@@ -56,9 +55,9 @@ class _DiaryScreenState extends State<DiaryScreen>
       if (!mounted) return;
       setState(() {
         _log = results[0] as DailyLog;
-        _waterMl = ((results[1] as Map<String, dynamic>)['totalMl'] as num?)
-                ?.toDouble() ??
-            0;
+        final water = results[1] as DailyWater;
+        _waterMl = water.totalMl;
+        _waterEntries = water.entries;
         _targets = results[2] as Targets?;
         _loading = false;
       });
@@ -124,15 +123,20 @@ class _DiaryScreenState extends State<DiaryScreen>
             const SizedBox(height: 8),
             TextField(
               controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               decoration: const InputDecoration(suffixText: '× serving'),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save')),
         ],
       ),
     );
@@ -202,6 +206,8 @@ class _DiaryScreenState extends State<DiaryScreen>
     final today = DateTime.now();
     final dateLabel =
         '${_weekday(today.weekday)}, ${_month(today.month)} ${today.day}';
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       backgroundColor: CalorificColors.cream,
@@ -211,7 +217,7 @@ class _DiaryScreenState extends State<DiaryScreen>
             // ── Header ──
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              padding: EdgeInsets.fromLTRB(20, 12, 20, isLandscape ? 10 : 16),
               child: Column(
                 children: [
                   Row(
@@ -220,10 +226,11 @@ class _DiaryScreenState extends State<DiaryScreen>
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(dateLabel,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  color: CalorificColors.textMuted)),
+                          if (!isLandscape)
+                            Text(dateLabel,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: CalorificColors.textMuted)),
                           const Text('Diary',
                               style: TextStyle(
                                   fontSize: 20,
@@ -248,80 +255,23 @@ class _DiaryScreenState extends State<DiaryScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isLandscape ? 8 : 12),
 
-                  // Calorie/macro summary
+                  // Calorie/macro summary — a full vertical stack works fine
+                  // in portrait, but in landscape the screen is short, so this
+                  // card would otherwise eat most of the visible height. In
+                  // landscape everything collapses into a single compact row.
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 16, vertical: isLandscape ? 10 : 16),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF0FBF6),
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Calories',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: CalorificColors.textDark)),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  '${totals?.calories.round() ?? 0}',
-                                  style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: CalorificColors.green),
-                                ),
-                                if (_targets != null &&
-                                    _targets!.calorieTarget > 0)
-                                  Text(
-                                    ' / ${_targets!.calorieTarget.round()} kcal',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        color: CalorificColors.textMuted),
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _macroRing(
-                                'Protein',
-                                totals?.protein ?? 0,
-                                _targets?.proteinTarget,
-                                CalorificColors.protein),
-                            _macroRing('Carbs', totals?.carbs ?? 0,
-                                _targets?.carbTarget, CalorificColors.carbs),
-                            _macroRing('Fat', totals?.fat ?? 0,
-                                _targets?.fatTarget, CalorificColors.fat),
-                          ],
-                        ),
-                        if (_targets == null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 12),
-                            child: GestureDetector(
-                              onTap: () => _navigateAndReload('/goals'),
-                              child: const Text(
-                                'Set your goals to track progress →',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: CalorificColors.green),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                    child: isLandscape
+                        ? _summaryLandscape(totals)
+                        : _summaryPortrait(totals),
                   ),
                 ],
               ),
@@ -347,7 +297,8 @@ class _DiaryScreenState extends State<DiaryScreen>
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                       color: CalorificColors.textDark)),
-                              Text('${_waterMl.round()} ml  (${(_waterMl/1000).toStringAsFixed(1)} L)',
+                              Text(
+                                  '${_waterMl.round()} ml  (${(_waterMl / 1000).toStringAsFixed(1)} L)',
                                   style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
@@ -489,15 +440,20 @@ class _DiaryScreenState extends State<DiaryScreen>
                                                       .textDark)),
                                           const SizedBox(width: 12),
                                           GestureDetector(
-                                            onTap: () => _handleEditServings(item),
-                                            child: const Icon(Icons.edit_rounded,
+                                            onTap: () =>
+                                                _handleEditServings(item),
+                                            child: const Icon(
+                                                Icons.edit_rounded,
                                                 size: 16,
-                                                color: CalorificColors.textMuted),
+                                                color:
+                                                    CalorificColors.textMuted),
                                           ),
                                           const SizedBox(width: 8),
                                           GestureDetector(
-                                            onTap: () => _handleDeleteLog(item.id),
-                                            child: const Icon(Icons.close_rounded,
+                                            onTap: () =>
+                                                _handleDeleteLog(item.id),
+                                            child: const Icon(
+                                                Icons.close_rounded,
                                                 size: 18,
                                                 color: CalorificColors.danger),
                                           ),
@@ -541,26 +497,177 @@ class _DiaryScreenState extends State<DiaryScreen>
     );
   }
 
+  // Original vertical layout: calories on top, macro rings in a row below.
+  Widget _summaryPortrait(DailyTotals? totals) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Calories',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: CalorificColors.textDark)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  '${totals?.calories.round() ?? 0}',
+                  style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: CalorificColors.green),
+                ),
+                if (_targets != null && _targets!.calorieTarget > 0)
+                  Text(
+                    ' / ${_targets!.calorieTarget.round()} kcal',
+                    style: const TextStyle(
+                        fontSize: 13, color: CalorificColors.textMuted),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _macroRing('Protein', totals?.protein ?? 0, _targets?.proteinTarget,
+                CalorificColors.protein),
+            _macroRing('Carbs', totals?.carbs ?? 0, _targets?.carbTarget,
+                CalorificColors.carbs),
+            _macroRing('Fat', totals?.fat ?? 0, _targets?.fatTarget,
+                CalorificColors.fat),
+          ],
+        ),
+        if (_targets == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: GestureDetector(
+              onTap: () => _navigateAndReload('/goals'),
+              child: const Text(
+                'Set your goals to track progress →',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: CalorificColors.green),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Landscape gets a short screen, so everything collapses into one row:
+  // calories on the left, a divider, then the three macro rings (shrunk a
+  // touch) sharing the remaining width. This keeps the card's height close
+  // to a single row instead of ~3x that in the stacked portrait layout.
+  Widget _summaryLandscape(DailyTotals? totals) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          flex: 3,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Calories',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CalorificColors.textDark)),
+              const SizedBox(height: 2),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${totals?.calories.round() ?? 0}',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: CalorificColors.green),
+                  ),
+                  if (_targets != null && _targets!.calorieTarget > 0)
+                    Text(
+                      ' / ${_targets!.calorieTarget.round()} kcal',
+                      style: const TextStyle(
+                          fontSize: 11, color: CalorificColors.textMuted),
+                    ),
+                ],
+              ),
+              if (_targets == null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: GestureDetector(
+                    onTap: () => _navigateAndReload('/goals'),
+                    child: const Text(
+                      'Set goals →',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: CalorificColors.green),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        Container(
+          width: 1,
+          height: 48,
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          color: CalorificColors.green.withOpacity(0.2),
+        ),
+        Expanded(
+          flex: 5,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _macroRing('Protein', totals?.protein ?? 0,
+                  _targets?.proteinTarget, CalorificColors.protein,
+                  size: 44),
+              _macroRing('Carbs', totals?.carbs ?? 0, _targets?.carbTarget,
+                  CalorificColors.carbs,
+                  size: 44),
+              _macroRing('Fat', totals?.fat ?? 0, _targets?.fatTarget,
+                  CalorificColors.fat,
+                  size: 44),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   // Compact ring showing progress toward a macro goal. Falls back to a
   // plain gram count (no ring fill) when the person hasn't set a target yet.
-  Widget _macroRing(String label, double value, double? target, Color color) {
+  // `size` lets callers shrink it for tighter layouts (e.g. landscape).
+  Widget _macroRing(String label, double value, double? target, Color color,
+      {double size = 60}) {
     final hasTarget = target != null && target > 0;
     final pct = hasTarget ? value / target : 0.0;
     final clamped = pct < 0 ? 0.0 : (pct > 1 ? 1.0 : pct);
     final isOver = pct > 1.0;
     final ringColor = isOver ? CalorificColors.danger : color;
+    final labelSize = size < 55 ? 10.0 : 11.0;
+    final valueSize = size < 55 ? 9.0 : 10.0;
+    final pctSize = size < 55 ? 11.0 : 12.0;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 60,
-          height: 60,
+          width: size,
+          height: size,
           child: Stack(
             alignment: Alignment.center,
             children: [
               SizedBox(
-                width: 60,
-                height: 60,
+                width: size,
+                height: size,
                 child: CircularProgressIndicator(
                   value: hasTarget ? clamped : 0,
                   strokeWidth: 6,
@@ -570,18 +677,18 @@ class _DiaryScreenState extends State<DiaryScreen>
               ),
               Text(
                 hasTarget ? '${(pct * 100).round()}%' : '${value.round()}g',
-                style: const TextStyle(
-                    fontSize: 12,
+                style: TextStyle(
+                    fontSize: pctSize,
                     fontWeight: FontWeight.bold,
                     color: CalorificColors.textDark),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Text(label,
-            style: const TextStyle(
-                fontSize: 11,
+            style: TextStyle(
+                fontSize: labelSize,
                 fontWeight: FontWeight.w600,
                 color: CalorificColors.textDark)),
         Text(
@@ -589,7 +696,7 @@ class _DiaryScreenState extends State<DiaryScreen>
               ? '${value.round()}/${target.round()}g'
               : '${value.round()}g',
           style:
-              const TextStyle(fontSize: 10, color: CalorificColors.textMuted),
+              TextStyle(fontSize: valueSize, color: CalorificColors.textMuted),
         ),
       ],
     );
@@ -638,10 +745,15 @@ class _DiaryScreenState extends State<DiaryScreen>
         'Nov',
         'Dec'
       ][month - 1];
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 }
 
 // ─── Food search bottom sheet ──────────────────────────────────
-
 class _FoodSearchSheet extends StatefulWidget {
   final VoidCallback onFoodLogged;
   const _FoodSearchSheet({required this.onFoodLogged});
@@ -865,7 +977,6 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
