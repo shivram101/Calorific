@@ -38,16 +38,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static const double _cmPerInch = 2.54;
   static const double _kgPerLb = 0.45359237;
 
+  // Each tuple: (apiValue, displayLabel, icon)
   static const activities = [
-    'Sedentary',
-    'Lightly active',
-    'Active',
-    'Very active'
+    ('sedentary', 'Sedentary', '🛋️'),
+    ('light', 'Light', '🚶'),
+    ('moderate', 'Moderate', '🏃'),
+    ('active', 'Active', '⚡'),
+    ('veryActive', 'Very active', '🏆'),
   ];
   static const goals = [
-    ('lose', 'Lose', '📉'),
+    ('lose', 'Lose weight', '🔻'),
     ('maintain', 'Maintain', '⚖️'),
-    ('gain', 'Gain', '📈'),
+    ('build', 'Build muscle', '💪'),
+    ('gain', 'Gain weight', '📈'),
   ];
 
   @override
@@ -381,31 +384,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: activities
-                      .map((a) => GestureDetector(
-                            onTap: () => setState(() {
-                              _activityLevel = a;
-                              _saved = false;
-                            }),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _activityLevel == a
-                                    ? CalorificColors.green
-                                    : CalorificColors.cream,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(a,
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _activityLevel == a
-                                          ? Colors.white
-                                          : CalorificColors.textMuted)),
-                            ),
-                          ))
-                      .toList(),
+                  children: activities.map((rec) {
+                    final apiVal = rec.$1;
+                    final label = rec.$2;
+                    final icon = rec.$3;
+                    final active = _activityLevel == apiVal;
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _activityLevel = apiVal;
+                        _saved = false;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: active
+                              ? CalorificColors.green
+                              : CalorificColors.cream,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: active
+                                ? CalorificColors.green
+                                : Colors.transparent,
+                          ),
+                        ),
+                        child: Text('$icon $label',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: active
+                                    ? Colors.white
+                                    : CalorificColors.textMuted)),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -448,6 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       const SizedBox(height: 2),
                                       Text(g.$2,
                                           style: TextStyle(
+                                              letterSpacing: 0.05,
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
                                               color: _goal == g.$1

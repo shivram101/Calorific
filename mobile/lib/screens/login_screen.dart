@@ -18,6 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _showPassword = false;
   bool _loading = false;
+  bool _needsVerification = false;
+  String _resendStatus = 'idle';
   String? _error;
 
   Future<void> _handleLogin() async {
@@ -41,15 +43,32 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
 
       // First login → onboarding if profile incomplete
-      if (profile.heightCm == null || profile.weightKg == null || profile.goal == null) {
+      if (profile.heightCm == null ||
+          profile.weightKg == null ||
+          profile.goal == null) {
         Navigator.pushReplacementNamed(context, '/onboarding');
       } else {
         Navigator.pushReplacementNamed(context, '/diary');
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final msg = e.toString();
+      setState(() {
+        _error = msg;
+        _needsVerification = msg.toLowerCase().contains('verify');
+        _resendStatus = 'idle';
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleResend() async {
+    setState(() => _resendStatus = 'sending');
+    try {
+      await resendVerification(_emailController.text.trim());
+      if (mounted) setState(() => _resendStatus = 'sent');
+    } catch (_) {
+      if (mounted) setState(() => _resendStatus = 'idle');
     }
   }
 
@@ -66,7 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Welcome badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: CalorificColors.greenLight,
                     borderRadius: BorderRadius.circular(20),
@@ -261,7 +281,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           GestureDetector(
-                            onTap: () => Navigator.pushNamed(context, '/signup'),
+                            onTap: () =>
+                                Navigator.pushNamed(context, '/signup'),
                             child: const Text(
                               'Sign up',
                               style: TextStyle(
