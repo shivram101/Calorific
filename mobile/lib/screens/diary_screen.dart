@@ -2,6 +2,7 @@
 // Main diary screen — daily food log, macro summary, water tracking,
 // food search, and navigation to all other screens.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../api/client.dart';
 import '../main.dart';
@@ -13,9 +14,11 @@ class DiaryScreen extends StatefulWidget {
   State<DiaryScreen> createState() => _DiaryScreenState();
 }
 
-class _DiaryScreenState extends State<DiaryScreen> {
+class _DiaryScreenState extends State<DiaryScreen>
+    with WidgetsBindingObserver {
   DailyLog? _log;
   double _waterMl = 0;
+  List<WaterEntry> _waterEntries = [];
   bool _loading = true;
   Targets? _targets;
 
@@ -30,7 +33,16 @@ class _DiaryScreenState extends State<DiaryScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadDiary();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Reload diary when app comes back to foreground so web changes appear.
+    if (state == AppLifecycleState.resumed) {
+      _loadDiary();
+    }
   }
 
   Future<void> _loadDiary() async {
@@ -64,13 +76,16 @@ class _DiaryScreenState extends State<DiaryScreen> {
   int _pendingWater = 0;
 
   Future<void> _handleAddWater(double amount) async {
-    // Optimistic update: bump the counter instantly. Rapid taps each bump;
-    // the server total is only reconciled once ALL in-flight requests finish,
-    // so the number never flickers backwards mid-burst.
-    setState(() => _waterMl += amount);
+    setState(() => _waterMl += amount); // optimistic
     _pendingWater++;
     try {
-      await addWater(amount, todayString());
+      final water = await addWater(amount, todayString());
+      if (mounted && _pendingWater <= 1) {
+        setState(() {
+          _waterMl = water.totalMl;
+          _waterEntries = water.entries;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _waterMl -= amount);
@@ -78,15 +93,57 @@ class _DiaryScreenState extends State<DiaryScreen> {
       }
     } finally {
       _pendingWater--;
-      if (_pendingWater == 0) {
-        try {
-          final water = await getWater(todayString());
-          if (mounted && _pendingWater == 0) {
-            setState(() =>
-                _waterMl = ((water['totalMl'] as num?) ?? _waterMl).toDouble());
-          }
-        } catch (_) {}
+    }
+  }
+
+  Future<void> _handleDeleteWater(String id) async {
+    try {
+      await deleteWater(id);
+      final water = await getWater(todayString());
+      if (mounted) {
+        setState(() {
+          _waterMl = water.totalMl;
+          _waterEntries = water.entries;
+        });
       }
+    } catch (e) {
+      if (mounted) _showError(e.toString());
+    }
+  }
+
+  Future<void> _handleEditServings(LogEntry entry) async {
+    final controller = TextEditingController(text: entry.quantity.toString());
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(entry.foodName),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Edit servings:', style: TextStyle(fontSize: 13)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(suffixText: '× serving'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final qty = double.tryParse(controller.text);
+    if (qty == null || qty <= 0) return;
+    try {
+      await updateLog(entry.id, quantity: qty);
+      await _loadDiary();
+    } catch (e) {
+      if (mounted) _showError(e.toString());
     }
   }
 
@@ -290,7 +347,7 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
                                       color: CalorificColors.textDark)),
-                              Text('${_waterMl.round()} ml',
+                              Text('${_waterMl.round()} ml  (${(_waterMl/1000).toStringAsFixed(1)} L)',
                                   style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
@@ -432,10 +489,15 @@ class _DiaryScreenState extends State<DiaryScreen> {
                                                       .textDark)),
                                           const SizedBox(width: 12),
                                           GestureDetector(
-                                            onTap: () =>
-                                                _handleDeleteLog(item.id),
-                                            child: const Icon(
-                                                Icons.close_rounded,
+                                            onTap: () => _handleEditServings(item),
+                                            child: const Icon(Icons.edit_rounded,
+                                                size: 16,
+                                                color: CalorificColors.textMuted),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          GestureDetector(
+                                            onTap: () => _handleDeleteLog(item.id),
+                                            child: const Icon(Icons.close_rounded,
                                                 size: 18,
                                                 color: CalorificColors.danger),
                                           ),
@@ -592,6 +654,7 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
   final _searchController = TextEditingController();
   List<Food> _results = [];
   bool _searching = false;
+  Timer? _searchDebounce;
 
   Future<void> _handleSearch() async {
     final query = _searchController.text.trim();
@@ -657,6 +720,14 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
                         child: TextField(
                           controller: _searchController,
                           onSubmitted: (_) => _handleSearch(),
+                          onChanged: (value) {
+                            _searchDebounce?.cancel();
+                            if (value.trim().isEmpty) return;
+                            _searchDebounce = Timer(
+                              const Duration(milliseconds: 400),
+                              _handleSearch,
+                            );
+                          },
                           textInputAction: TextInputAction.search,
                           decoration: const InputDecoration(
                               hintText: 'Search foods...'),
@@ -794,6 +865,8 @@ class _FoodSearchSheetState extends State<_FoodSearchSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }

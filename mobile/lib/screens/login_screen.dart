@@ -18,6 +18,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _showPassword = false;
   bool _loading = false;
+  bool _needsVerification = false;
+  String _resendStatus = 'idle';
   String? _error;
 
   Future<void> _handleLogin() async {
@@ -47,9 +49,24 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pushReplacementNamed(context, '/diary');
       }
     } catch (e) {
-      setState(() => _error = e.toString());
+      final msg = e.toString();
+      setState(() {
+        _error = msg;
+        _needsVerification = msg.toLowerCase().contains('verify');
+        _resendStatus = 'idle';
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _handleResend() async {
+    setState(() => _resendStatus = 'sending');
+    try {
+      await resendVerification(_emailController.text.trim());
+      if (mounted) setState(() => _resendStatus = 'sent');
+    } catch (_) {
+      if (mounted) setState(() => _resendStatus = 'idle');
     }
   }
 

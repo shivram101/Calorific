@@ -1,13 +1,11 @@
 // lib/api/client.dart
-// Central API client for Calorific — Dart equivalent of the web/mobile client.ts.
-// All HTTP calls to the Express backend go through here.
-// JWT is stored in SharedPreferences and attached to protected requests.
+// Central API client for Calorific — updated to match web client.ts parity.
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String baseUrl = 'http://157.230.230.192/api';
+const String baseUrl = 'https://contactmanager24.xyz/api';
 
 // ─── Token helpers ───────────────────────────────────────────────
 
@@ -75,10 +73,10 @@ Future<dynamic> _request(
   final data = response.body.isNotEmpty ? jsonDecode(response.body) : null;
 
   if (response.statusCode >= 400) {
-    final message = (data is Map && data['error'] != null)
+    final msg = (data is Map && data['error'] != null)
         ? data['error'] as String
         : 'Something went wrong';
-    throw ApiException(message, response.statusCode);
+    throw ApiException(msg, response.statusCode);
   }
 
   return data;
@@ -191,6 +189,28 @@ class DailyLog {
         totals = DailyTotals.fromJson(json['totals'] ?? {});
 }
 
+class WaterEntry {
+  final String id;
+  final double amountMl;
+  final String date;
+
+  WaterEntry.fromJson(Map<String, dynamic> json)
+      : id = json['_id'] ?? '',
+        amountMl = (json['amountMl'] as num?)?.toDouble() ?? 0,
+        date = json['date'] ?? '';
+}
+
+class DailyWater {
+  final double totalMl;
+  final List<WaterEntry> entries;
+
+  DailyWater.fromJson(Map<String, dynamic> json)
+      : totalMl = (json['totalMl'] as num?)?.toDouble() ?? 0,
+        entries = ((json['entries'] ?? []) as List)
+            .map((e) => WaterEntry.fromJson(e))
+            .toList();
+}
+
 class Targets {
   final double calorieTarget;
   final double proteinTarget;
@@ -230,9 +250,14 @@ class DailySummary {
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
+/// Returns today's date as YYYY-MM-DD in the device's LOCAL timezone.
+/// (Using toUtc() caused late-night entries to appear on the next day.)
 String todayString() {
-  final now = DateTime.now().toUtc();
-  return now.toIso8601String().substring(0, 10);
+  final now = DateTime.now();
+  final y = now.year.toString().padLeft(4, '0');
+  final m = now.month.toString().padLeft(2, '0');
+  final d = now.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
 }
 
 // ─── Auth ────────────────────────────────────────────────────────
@@ -267,6 +292,11 @@ Future<void> logout() async {
 
 Future<void> forgotPassword(String email) async {
   await _request('POST', '/forgot-password', auth: false, body: {'email': email});
+}
+
+Future<void> resendVerification(String email) async {
+  await _request('POST', '/resend-verification',
+      auth: false, body: {'email': email});
 }
 
 // ─── Profile ─────────────────────────────────────────────────────
@@ -348,23 +378,33 @@ Future<void> addLog({
   });
 }
 
+/// Update an existing log entry's quantity or meal.
+Future<void> updateLog(String id, {double? quantity, String? meal}) async {
+  final body = <String, dynamic>{};
+  if (quantity != null) body['quantity'] = quantity;
+  if (meal != null) body['meal'] = meal;
+  await _request('PUT', '/logs/$id', body: body);
+}
+
 Future<void> deleteLog(String id) async {
   await _request('DELETE', '/logs/$id');
 }
 
 // ─── Water ───────────────────────────────────────────────────────
 
-Future<Map<String, dynamic>> getWater(String date) async {
+Future<DailyWater> getWater(String date) async {
   final data = await _request('GET', '/water?date=$date');
-  return data as Map<String, dynamic>;
+  return DailyWater.fromJson(data);
 }
 
-Future<Map<String, dynamic>> addWater(double amountMl, String date) async {
-  final data = await _request('POST', '/water', body: {
-    'amountMl': amountMl,
-    'date': date,
-  });
-  return data as Map<String, dynamic>;
+Future<DailyWater> addWater(double amountMl, String date) async {
+  await _request('POST', '/water', body: {'amountMl': amountMl, 'date': date});
+  // POST returns the single entry — refetch to get updated total + entries list
+  return getWater(date);
+}
+
+Future<void> deleteWater(String id) async {
+  await _request('DELETE', '/water/$id');
 }
 
 // ─── Targets ─────────────────────────────────────────────────────
@@ -387,6 +427,13 @@ Future<Targets> setTargets({
     'carbTarget': carbTarget,
     'fatTarget': fatTarget,
   });
+  return Targets.fromJson(data);
+}
+
+/// Fetch server-calculated targets from biometrics + current goal.
+/// Mirrors GET /api/targets/suggested on the backend.
+Future<Targets> getSuggestedTargets() async {
+  final data = await _request('GET', '/targets/suggested');
   return Targets.fromJson(data);
 }
 
