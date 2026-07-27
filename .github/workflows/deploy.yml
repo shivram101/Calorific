@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # Quality gate. Runs on every push AND every PR. Deploy will not start unless
+  # this passes, so a type error can never reach production.
+  # ───────────────────────────────────────────────────────────────────────────
+  quality:
+    name: Typecheck, lint, and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # This is the step that catches duplicate exports, missing imports, and
+      # bad types — the entire class of bug that produced white screens.
+      - name: Typecheck frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test -- --run
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      # Node has no compiler, so parse every backend file instead. Catches
+      # syntax errors before they take the API down on boot.
+      - name: Syntax-check backend
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          find . -name "*.js" -not -path "./node_modules/*" -print0 \
+            | xargs -0 -n1 node --check
+          echo "All backend files parsed successfully."
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # Deploy. Only runs on direct pushes to main, and only if quality passed.
+  # ───────────────────────────────────────────────────────────────────────────
   deploy:
+    name: Deploy to droplet
+    needs: quality
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -145,7 +207,8 @@ jobs:
               'SENDGRID_FROM_EMAIL',
               'CLIENT_URL',
               'FDC_API_KEY',
-              'PORT'
+              'PORT',
+              'ALLOWED_ORIGINS'
             ];
 
             const missing = required.filter((name) => !process.env[name]);
