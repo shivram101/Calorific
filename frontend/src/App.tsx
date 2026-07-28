@@ -1,32 +1,23 @@
 // src/App.tsx
-// FIX: /verify-email route changed to /verify-email/:token (path param)
-// so VerifyEmailPage can read the token via useParams() instead of useSearchParams().
-// This matches the API endpoint: GET /api/verify-email/:token
+// Auth0 handles login/signup/verification/password-reset via its own hosted
+// Universal Login page, so those routes now just redirect out to Auth0
+// instead of rendering custom forms. ForgotPassword/ResetPassword/VerifyEmail
+// pages are retired entirely — Auth0 handles all three natively.
 
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { getToken } from './api/client';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import OnboardingPage from './pages/OnboardingPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
 import DashboardPage from './pages/DashboardPage';
 import GoalsPage from './pages/GoalsPage';
 import ProgressPage from './pages/ProgressPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
 import SettingsPage from './pages/SettingsPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
-// Wraps pages that need a logged-in user: if there's no JWT in storage,
-// redirect to /login instead of rendering an empty page.
-function RequireAuth({ children }: { children: React.ReactElement }) {
-  return getToken() ? children : <Navigate to="/login" replace />;
-}
-
-// Catch-all for unmatched URLs. Email links can arrive with duplicate slashes
-// (e.g. a CLIENT_URL with a trailing slash produces domain//verify-email/...),
-// which would otherwise render a blank page. Collapse the slashes and retry;
-// anything else goes to the landing page.
+// Catch-all for unmatched URLs. Collapses accidental double slashes
+// (e.g. a trailing-slash CLIENT_URL producing domain//something), then
+// falls back to the landing page for anything else.
 function CatchAll() {
   const { pathname, search } = useLocation();
   if (/\/{2,}/.test(pathname)) {
@@ -37,22 +28,17 @@ function CatchAll() {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
-        <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
-        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-        <Route path="/Dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
-        <Route path="/goals" element={<RequireAuth><GoalsPage /></RequireAuth>} />
-        <Route path="/progress" element={<RequireAuth><ProgressPage /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-        <Route path="*" element={<CatchAll />} />
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/onboarding" element={<ProtectedRoute component={OnboardingPage} />} />
+      <Route path="/Dashboard" element={<ProtectedRoute component={DashboardPage} />} />
+      <Route path="/goals" element={<ProtectedRoute component={GoalsPage} />} />
+      <Route path="/progress" element={<ProtectedRoute component={ProgressPage} />} />
+      <Route path="/settings" element={<ProtectedRoute component={SettingsPage} />} />
+      <Route path="*" element={<CatchAll />} />
+    </Routes>
   );
 }
 
