@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-const String baseUrl = 'https://contactmanager24.xyz/api';
+const String baseUrl = 'https://calorific-api-begdg4bhf0gga5d2.northcentralus-01.azurewebsites.net';
 
 // ─── Token helpers ───────────────────────────────────────────────
 

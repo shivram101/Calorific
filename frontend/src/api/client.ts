@@ -9,8 +9,10 @@
 
 // Dev: talk to the local backend directly.
 // Production build: use a relative /api path — nginx on the droplet forwards it to the backend.
-const BASE_URL = import.meta.env.DEV ? 'http://localhost:5000/api' : '/api';
-
+const BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:5000/api' 
+  : 'https://calorific-api-begdg4bhf0gga5d2.northcentralus-01.azurewebsites.net/api';
+  
 // ─── Token helpers ────────────────────────────────────────────────────────────
 // The JWT is stored in localStorage after login and attached to every
 // protected request automatically.
