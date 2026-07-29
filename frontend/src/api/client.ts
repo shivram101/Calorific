@@ -3,38 +3,41 @@
 // All fetch calls go through here — pages import named functions instead of
 // writing raw fetch calls with hardcoded URLs.
 //
-// Usage examples:
-//   import { login, register, searchFoods, getLogs } from '../api/client';
-//   const { token, user } = await login('email@test.com', 'password123');
+// AUTH0 MIGRATION NOTE: this file is a plain module, not a React component,
+// so it can't use the useAuth0() hook to read the current session (hooks
+// only work inside components). Instead we create a second, lightweight
+// Auth0Client instance here using the same config as the Auth0Provider in
+// main.tsx. Because both instances use cacheLocation: 'localstorage', they
+// share the exact same underlying session — logging in via the Provider in
+// main.tsx makes the token immediately available here too, with no extra
+// network round-trip or duplicate login prompt.
+
+import { Auth0Client } from '@auth0/auth0-spa-js';
 
 // Dev: talk to the local backend directly.
-// Production build: use a relative /api path — nginx on the droplet forwards it to the backend.
-const BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:5000/api' 
+// Production build: hit the deployed Azure backend directly.
+const BASE_URL = import.meta.env.DEV
+  ? 'http://localhost:5001/api'
   : 'https://calorific-api-begdg4bhf0gga5d2.northcentralus-01.azurewebsites.net/api';
-  
-// ─── Token helpers ────────────────────────────────────────────────────────────
-// The JWT is stored in localStorage after login and attached to every
-// protected request automatically.
 
-export function getToken(): string | null {
-  return localStorage.getItem('token');
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem('token', token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem('token');
-}
+// Must exactly match the domain/clientId/audience used in main.tsx's
+// Auth0Provider, or this instance won't see the same session.
+const auth0Client = new Auth0Client({
+  domain: 'dev-vqru0yyw14evmlui.us.auth0.com',
+  clientId: 'WvuIm5jylPNX2XVVdr1Dt2reWtg6Mum2',
+  authorizationParams: {
+    audience: 'https://calorific-api.azurewebsites.net',
+  },
+  cacheLocation: 'localstorage',
+  useRefreshTokens: true,
+});
 
 // ─── Base fetch wrapper ───────────────────────────────────────────────────────
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 interface RequestOptions {
-  auth?: boolean;       // attach Bearer token (default: true for non-auth routes)
+  auth?: boolean;       // attach Bearer token (default: true for protected routes)
   body?: unknown;       // JSON body for POST/PUT
 }
 
@@ -50,9 +53,16 @@ async function request<T>(
   };
 
   if (auth) {
-    const token = getToken();
-    if (token) {
+    try {
+      // Returns a cached token if still valid, or silently refreshes it
+      // using the active Auth0 session — never prompts a login redirect
+      // from inside a plain fetch call.
+      const token = await auth0Client.getTokenSilently();
       headers['Authorization'] = `Bearer ${token}`;
+    } catch {
+      // No active Auth0 session. Proceed without a token — the backend
+      // correctly rejects this with 401, and ProtectedRoute normally
+      // redirects to login before this code path is even reachable.
     }
   }
 
@@ -73,82 +83,31 @@ async function request<T>(
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
-
-export interface RegisterResult {
-  message: string;
-  userId: string;
-}
-
-export async function register(
-  email: string,
-  password: string,
-  firstName: string,
-  lastName: string
-): Promise<RegisterResult> {
-  return request<RegisterResult>('POST', '/register', {
-    auth: false,
-    body: { email, password, firstName, lastName },
-  });
-}
-
-export interface LoginResult {
-  token: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
-}
-
-export async function login(email: string, password: string): Promise<LoginResult> {
-  const result = await request<LoginResult>('POST', '/login', {
-    auth: false,
-    body: { email, password },
-  });
-  // Store the JWT so all subsequent calls are automatically authenticated
-  setToken(result.token);
-  // Store first name so any page can greet the user without an extra API call
-  localStorage.setItem('calorific_user', JSON.stringify({ firstName: result.user.firstName }));
-  return result;
-}
-
-export function getStoredFirstName(): string {
-  try {
-    const raw = localStorage.getItem('calorific_user');
-    if (raw) return JSON.parse(raw).firstName || '';
-  } catch {}
-  return '';
-}
+// Registration, login, email verification, and password reset are all now
+// handled by Auth0's hosted Universal Login page — this module no longer
+// implements any of that itself. logout() and getStoredFirstName() remain
+// here since pages already call them, now backed by Auth0 instead of a
+// custom JWT.
 
 export function logout(): void {
-  clearToken();
-  window.location.href = '/login';
+  auth0Client.logout({ logoutParams: { returnTo: window.location.origin } });
 }
 
-export async function verifyEmail(token: string): Promise<{ message: string }> {
-  return request<{ message: string }>('GET', `/verify-email/${token}`, { auth: false });
-}
-
-export async function resendVerification(email: string): Promise<{ message: string }> {
-  return request<{ message: string }>('POST', '/resend-verification', { auth: false, body: { email } });
-}
-
-export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return request<{ message: string }>('POST', '/forgot-password', {
-    auth: false,
-    body: { email },
-  });
-}
-
-export async function resetPassword(
-  token: string,
-  newPassword: string
-): Promise<{ message: string }> {
-  return request<{ message: string }>('POST', `/reset-password/${token}`, {
-    auth: false,
-    body: { newPassword },
-  });
+// Reads the user's first name from Auth0's cached session info (set after
+// login completes), so pages can greet the user without an extra API call.
+// Falls back to an empty string if the session hasn't loaded yet — pages
+// already handle that by showing "there" as a friendly default.
+export function getStoredFirstName(): string {
+  try {
+    const claims = JSON.parse(localStorage.getItem(
+      `@@auth0spajs@@::WvuIm5jylPNX2XVVdr1Dt2reWtg6Mum2::https://calorific-api.azurewebsites.net::openid profile email`
+    ) || 'null');
+    const name = claims?.body?.decodedToken?.user?.given_name
+      || claims?.body?.decodedToken?.user?.name;
+    return name || '';
+  } catch {
+    return '';
+  }
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────

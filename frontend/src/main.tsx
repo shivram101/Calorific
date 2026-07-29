@@ -23,12 +23,18 @@ function Auth0ProviderWithNavigate({ children }: { children: React.ReactNode }) 
       clientId="WvuIm5jylPNX2XVVdr1Dt2reWtg6Mum2"
       authorizationParams={{
         redirect_uri: window.location.origin,
-        // REQUIRED for the backend to receive a real JWT instead of an
-        // opaque token. Replace with your actual API Identifier once
-        // you've created the "Calorific API" application in Auth0.
         audience: 'https://calorific-api.azurewebsites.net',
       }}
       onRedirectCallback={onRedirectCallback}
+      // MUST match the standalone Auth0Client in client.ts exactly, or the
+      // two instances store their sessions in different places and can
+      // never see each other's login state (this was the actual bug behind
+      // "Missing or malformed Authorization header" tonight).
+      cacheLocation="localstorage"
+      // Avoids Auth0's hidden-iframe silent-auth technique entirely, which
+      // Chrome/Safari increasingly block via third-party cookie
+      // restrictions. Refresh tokens are the modern, reliable alternative.
+      useRefreshTokens={true}
     >
       {children}
     </Auth0Provider>

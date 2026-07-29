@@ -9,11 +9,18 @@
 // its own tokens via POST /api/login. Once mobile is migrated too, the
 // legacy path can be removed.
 //
-// req.userId is set on success either way, so every existing route
-// handler works unchanged regardless of which auth system issued the token.
+// IMPORTANT: every route in this app queries Mongo with
+// `new ObjectId(req.userId)`. Auth0's user identifier (the "sub" claim,
+// e.g. "auth0|abc123") is NOT a valid Mongo ObjectId, so we never expose
+// it to route handlers directly. Instead, on a successful Auth0 login we
+// look up (or just-in-time create) a real Mongo user document for that
+// Auth0 identity, then set req.userId to THAT document's real ObjectId.
+// Every existing route works unchanged, with zero knowledge that Auth0
+// exists at all.
 
 const jwt = require("jsonwebtoken");
 const { auth } = require("express-oauth2-jwt-bearer");
+const { getDB } = require("../db");
 
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;     // e.g. dev-vqru0yyw14evmlui.us.auth0.com
 const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE; // e.g. https://calorific-api.azurewebsites.net
@@ -29,10 +36,10 @@ const checkAuth0Jwt = AUTH0_DOMAIN && AUTH0_AUDIENCE
   : null;
 
 // A JWT is three base64url segments separated by dots. We peek at the
-// header segment (not the signature) just to read which issuer signed it,
-// so we know which verification path to use. This is NOT itself a security
-// check — it only decides which validator runs; the validator does the
-// actual cryptographic verification.
+// header/payload segment (not the signature) just to read which issuer
+// signed it, so we know which verification path to use. This is NOT a
+// security check on its own — it only decides which validator runs; the
+// validator does the actual cryptographic verification afterward.
 function looksLikeAuth0Token(token) {
   try {
     const payloadSegment = token.split(".")[1];
@@ -44,6 +51,65 @@ function looksLikeAuth0Token(token) {
   }
 }
 
+// Finds the Mongo user document for a given Auth0 identity, creating one
+// on first login if it doesn't exist yet ("just-in-time provisioning").
+//
+// Hot path (returning user): a single indexed findOne — fast, no extra
+// network calls. Cold path (brand new user): one call to Auth0's
+// /userinfo endpoint to seed name/email so Settings isn't blank on first
+// login, then an atomic upsert so two near-simultaneous first requests
+// can't create duplicate accounts for the same person.
+async function provisionAuth0User(db, sub, accessToken) {
+  const users = db.collection("users");
+
+  const existing = await users.findOne({ auth0Id: sub });
+  if (existing) return existing;
+
+  let profile = { email: "", firstName: "", lastName: "", emailVerified: true };
+  try {
+    const resp = await fetch(`https://${AUTH0_DOMAIN}/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (resp.ok) {
+      const info = await resp.json();
+      profile.email = info.email || "";
+      profile.firstName = info.given_name || (info.name ? info.name.split(" ")[0] : "");
+      profile.lastName = info.family_name || (info.name ? info.name.split(" ").slice(1).join(" ") : "");
+      if (typeof info.email_verified === "boolean") profile.emailVerified = info.email_verified;
+    }
+  } catch {
+    // Auth0's /userinfo call failed — proceed with blank profile fields.
+    // The user can fill in their name via Settings; this never blocks login.
+  }
+
+  const user = await users.findOneAndUpdate(
+    { auth0Id: sub },
+    {
+      $setOnInsert: {
+        auth0Id: sub,
+        email: profile.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        passwordHash: null,       // Auth0 owns credentials for this account
+        isVerified: profile.emailVerified,
+        verificationToken: null,
+        resetToken: null,
+        resetTokenExpires: null,
+        // Profile fields filled in later via onboarding, same as legacy signups.
+        heightCm: null,
+        weightKg: null,
+        sex: null,
+        activityLevel: null,
+        goal: null,
+        age: null,
+        createdAt: new Date(),
+      },
+    },
+    { upsert: true, returnDocument: "after" }
+  );
+  return user;
+}
+
 function requireAuth(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -53,19 +119,22 @@ function requireAuth(req, res, next) {
 
   const token = authHeader.split(" ")[1];
 
-  // Route to Auth0 validation if this looks like an Auth0 token and Auth0
-  // is actually configured on this server.
   if (checkAuth0Jwt && looksLikeAuth0Token(token)) {
-    return checkAuth0Jwt(req, res, (err) => {
+    return checkAuth0Jwt(req, res, async (err) => {
       if (err) {
         return res.status(401).json({ error: "Invalid or expired token" });
       }
-      // Auth0's middleware attaches the verified claims at req.auth.payload.
-      // `sub` is Auth0's stable user identifier (e.g. "auth0|abc123" or
-      // "google-oauth2|456"), used the same way req.userId always has been.
-      req.userId = req.auth.payload.sub;
-      req.authProvider = "auth0";
-      return next();
+      try {
+        const db = getDB();
+        const sub = req.auth.payload.sub;
+        const user = await provisionAuth0User(db, sub, token);
+        req.userId = user._id.toString();
+        req.authProvider = "auth0";
+        return next();
+      } catch (provisionErr) {
+        console.error("Auth0 user provisioning error:", provisionErr);
+        return res.status(500).json({ error: "Server error provisioning user account" });
+      }
     });
   }
 
