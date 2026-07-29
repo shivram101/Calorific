@@ -1,84 +1,266 @@
-// middleware/auth.js
-// Protects routes by requiring a valid token in the Authorization header.
+// routes/auth.js
+// Endpoints: POST /api/register, GET /api/verify-email/:token, POST /api/login,
+//            POST /api/forgot-password, POST /api/reset-password/:token
 //
-// Supports TWO token formats simultaneously during the web->Auth0 migration:
-//   1. Auth0-issued JWTs (web frontend, after the Auth0 migration)
-//   2. Legacy custom JWTs signed with JWT_SECRET (mobile app, unmigrated)
-//
-// This lets web move to Auth0 without breaking mobile, which still issues
-// its own tokens via POST /api/login. Once mobile is migrated too, the
-// legacy path can be removed.
-//
-// req.userId is set on success either way, so every existing route
-// handler works unchanged regardless of which auth system issued the token.
+// Uses the raw MongoDB driver only (no Mongoose), per course requirements.
 
+const express = require("express");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { auth } = require("express-oauth2-jwt-bearer");
+const crypto = require("crypto");
+const { ObjectId } = require("mongodb");
 
-const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN;     // e.g. dev-vqru0yyw14evmlui.us.auth0.com
-const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE; // e.g. https://calorific-api.azurewebsites.net
+const { getDB } = require("../db");
+const { sendVerificationEmail, sendPasswordResetEmail } = require("../emailService");
 
-// Auth0's own middleware, configured once and reused. It validates the
-// token's signature against Auth0's public JWKS keys, checks it hasn't
-// expired, and confirms the audience matches our API identifier.
-const checkAuth0Jwt = AUTH0_DOMAIN && AUTH0_AUDIENCE
-  ? auth({
-      audience: AUTH0_AUDIENCE,
-      issuerBaseURL: `https://${AUTH0_DOMAIN}`,
-    })
-  : null;
+const router = express.Router();
 
-// A JWT is three base64url segments separated by dots. We peek at the
-// header segment (not the signature) just to read which issuer signed it,
-// so we know which verification path to use. This is NOT itself a security
-// check — it only decides which validator runs; the validator does the
-// actual cryptographic verification.
-function looksLikeAuth0Token(token) {
+const SALT_ROUNDS = 10;
+const JWT_EXPIRY = "7d";
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+// ---------- POST /api/register ----------
+router.post("/register", async (req, res) => {
   try {
-    const payloadSegment = token.split(".")[1];
-    if (!payloadSegment) return false;
-    const payload = JSON.parse(Buffer.from(payloadSegment, "base64url").toString("utf8"));
-    return typeof payload.iss === "string" && payload.iss.includes("auth0.com");
-  } catch {
-    return false;
-  }
-}
+    const { email, password, firstName, lastName } = req.body;
 
-function requireAuth(req, res, next) {
-  const authHeader = req.headers.authorization;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or malformed Authorization header" });
-  }
+    const db = getDB();
+    const users = db.collection("users");
 
-  const token = authHeader.split(" ")[1];
+    const normalizedEmail = email.toLowerCase().trim();
+    const existing = await users.findOne({ email: normalizedEmail });
+    if (existing) {
+      return res.status(409).json({ error: "An account with this email already exists" });
+    }
 
-  // Route to Auth0 validation if this looks like an Auth0 token and Auth0
-  // is actually configured on this server.
-  if (checkAuth0Jwt && looksLikeAuth0Token(token)) {
-    return checkAuth0Jwt(req, res, (err) => {
-      if (err) {
-        return res.status(401).json({ error: "Invalid or expired token" });
-      }
-      // Auth0's middleware attaches the verified claims at req.auth.payload.
-      // `sub` is Auth0's stable user identifier (e.g. "auth0|abc123" or
-      // "google-oauth2|456"), used the same way req.userId always has been.
-      req.userId = req.auth.payload.sub;
-      req.authProvider = "auth0";
-      return next();
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    const newUser = {
+      email: normalizedEmail,
+      passwordHash,
+      firstName: firstName || "",
+      lastName: lastName || "",
+      isVerified: false,
+      verificationToken,
+      resetToken: null,
+      resetTokenExpires: null,
+      // profile fields, filled in later via onboarding (Section 2 Onboarding page)
+      heightCm: null,
+      weightKg: null,
+      sex: null,
+      activityLevel: null,
+      goal: null,
+      age: null,
+      createdAt: new Date(),
+    };
+
+    const result = await users.insertOne(newUser);
+
+    await sendVerificationEmail(normalizedEmail, verificationToken);
+
+    return res.status(201).json({
+      message: "Account created. Check your email to verify your account.",
+      userId: result.insertedId,
     });
-  }
-
-  // Legacy path: our own JWT_SECRET-signed tokens, still issued by the
-  // mobile app's POST /api/login until mobile is migrated to Auth0 too.
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    req.authProvider = "legacy";
-    next();
   } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    console.error("Register error:", err);
+    return res.status(500).json({ error: "Server error during registration" });
   }
-}
+});
 
-module.exports = { requireAuth };
+// ---------- GET /api/verify-email/:token ----------
+router.get("/verify-email/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const db = getDB();
+    const users = db.collection("users");
+
+    const user = await users.findOne({ verificationToken: token });
+        console.log("User found:", user ? user.email : "NOT FOUND"); // ADD THIS
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired verification link" });
+    }
+
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { isVerified: true }, $unset: { verificationToken: "" } }
+    );
+
+    return res.status(200).json({ message: "Email verified successfully. You can now log in." });
+  } catch (err) {
+    console.error("Verify email error:", err);
+    return res.status(500).json({ error: "Server error during email verification" });
+  }
+});
+
+// ---------- POST /api/login ----------
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const db = getDB();
+    const users = db.collection("users");
+
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await users.findOne({ email: normalizedEmail });
+
+    if (!user) {
+      // Same error as wrong password, so we don't reveal which emails exist
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const passwordMatches = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatches) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({ error: "Please verify your email before logging in" });
+    }
+
+    const token = jwt.sign({ userId: user._id.toString() }, process.env.JWT_SECRET, {
+      expiresIn: JWT_EXPIRY,
+    });
+
+    return res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ error: "Server error during login" });
+  }
+});
+
+// ---------- POST /api/resend-verification ----------
+// Generates a fresh token and re-sends the verification email.
+// Always returns 200 so we don't reveal whether an email is registered.
+router.post("/resend-verification", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const db = getDB();
+    const users = db.collection("users");
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await users.findOne({ email: normalizedEmail });
+
+    if (user && !user.isVerified) {
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      await users.updateOne(
+        { _id: user._id },
+        { $set: { verificationToken } }
+      );
+      await sendVerificationEmail(normalizedEmail, verificationToken);
+    }
+
+    return res.status(200).json({
+      message: "If that email exists and is unverified, a new link has been sent.",
+    });
+  } catch (err) {
+    console.error("Resend verification error:", err);
+    return res.status(500).json({ error: "Server error resending verification email" });
+  }
+});
+
+// ---------- POST /api/forgot-password ----------
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const db = getDB();
+    const users = db.collection("users");
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await users.findOne({ email: normalizedEmail });
+
+    // Always return success, even if the email isn't found.
+    // Prevents attackers from using this endpoint to discover registered emails.
+    if (!user) {
+      return res.status(200).json({
+        message: "If an account exists for that email, a reset link has been sent.",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { resetToken, resetTokenExpires } }
+    );
+
+    await sendPasswordResetEmail(normalizedEmail, resetToken);
+
+    return res.status(200).json({
+      message: "If an account exists for that email, a reset link has been sent.",
+    });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    return res.status(500).json({ error: "Server error during password reset request" });
+  }
+});
+
+// ---------- POST /api/reset-password/:token ----------
+router.post("/reset-password/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: "New password must be at least 8 characters" });
+    }
+
+    const db = getDB();
+    const users = db.collection("users");
+
+    const user = await users.findOne({
+      resetToken: token,
+      resetTokenExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Invalid or expired reset link" });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await users.updateOne(
+      { _id: user._id },
+      {
+        $set: { passwordHash },
+        $unset: { resetToken: "", resetTokenExpires: "" },
+      }
+    );
+
+    return res.status(200).json({ message: "Password reset successfully. You can now log in." });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    return res.status(500).json({ error: "Server error during password reset" });
+  }
+});
+
+module.exports = router;
