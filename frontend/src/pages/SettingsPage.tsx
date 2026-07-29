@@ -30,10 +30,9 @@ function kgToLbs(kg:number) { return Math.round(kg*KG_TO_LBS*10)/10; }
 function lbsToKg(lbs:number) { return Math.round((lbs/KG_TO_LBS)*10)/10; }
 
 function SettingsPage() {
-  const { logout } = useAuth0();
+  const { logout, user } = useAuth0();
   const navigate = useNavigate();
   const [email,        setEmail]        = useState('');
-  const [isVerified,   setIsVerified]   = useState(false);
   const [firstName,    setFirstName]    = useState('');
   const [lastName,     setLastName]     = useState('');
   const [age,          setAge]          = useState('');
@@ -53,7 +52,7 @@ function SettingsPage() {
 
   useEffect(() => {
     getProfile().then(data => {
-      setEmail(data.email||''); setIsVerified(!!data.isVerified);
+      setEmail(data.email||'');
       setFirstName(data.firstName||''); setLastName(data.lastName||'');
       setAge(data.age!=null?String(data.age):'');
       setActivityLevel(data.activityLevel||''); setGoal((data.goal as GoalType)||'');
@@ -176,9 +175,9 @@ function SettingsPage() {
         {section('Profile', 'Your name and email', '👤', (
           <>
             <div style={{ background:'#F0FBF6', borderRadius:12, padding:'12px 14px', marginBottom:16, display:'flex', alignItems:'center', gap:10, fontSize:13 }}>
-              <span style={{ fontSize:16 }}>{isVerified?'✅':'⚠️'}</span>
-              <span style={{ color:isVerified?'#0F6E56':'#8A6000', fontWeight:600 }}>{email}</span>
-              {!isVerified && <span style={{ fontSize:11, color:'#aaa' }}>· Unverified</span>}
+              <span style={{ fontSize:16 }}>{user?.email_verified?'✅':'⚠️'}</span>
+              <span style={{ color:user?.email_verified?'#0F6E56':'#8A6000', fontWeight:600 }}>{email}</span>
+              {!user?.email_verified && <span style={{ fontSize:11, color:'#aaa' }}>· Unverified</span>}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               {[['First name', firstName, setFirstName, 'Shivram'],['Last name', lastName, setLastName, 'Sundar']].map(([label, val, set, ph]:any) => (
