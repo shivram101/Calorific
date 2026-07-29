@@ -1,6 +1,7 @@
 // src/pages/GoalsPage.tsx
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import {
   getTargets, setTargets, getSuggestedTargets, updateProfile,
   getProfile, getStoredFirstName, getWater, getProgressSummary, todayString,
@@ -36,6 +37,7 @@ const MACROS = [
 ];
 
 function GoalsPage() {
+  const { logout } = useAuth0();
   const navigate = useNavigate();
   const [goalType,         setGoalType]         = useState<GoalType>('maintain');
   const [goals,            setGoals]             = useState<Goals>(DEFAULTS.maintain);
@@ -43,11 +45,7 @@ function GoalsPage() {
   const [loading,          setLoading]           = useState(true);
   const [error,            setError]             = useState('');
   const [suggestedLoading, setSuggestedLoading]  = useState(false);
-  const [waterTarget,      setWaterTarget]       = useState(() => {
-    // Legacy values: old Goals page stored raw numbers (e.g. "4" = 4 L) as ml.
-    const v = Number(localStorage.getItem('calorific_water_target')) || 2000;
-    return v > 0 && v < 100 ? Math.round(v * 1000) : v;
-  });
+  const [waterTarget,      setWaterTarget]       = useState(() => Number(localStorage.getItem('calorific_water_target')) || 2000);
   const [waterTodayMl,     setWaterTodayMl]      = useState(0);
   const [waterInput,       setWaterInput]        = useState('');
   const [waterUnit,        setWaterUnit]         = useState<'L'|'gal'>(() =>
@@ -168,7 +166,7 @@ function GoalsPage() {
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:12, color:'#2D2A26', background:'linear-gradient(135deg,#FFF8ED,#F5EFE0)', padding:'6px 12px', borderRadius:20, fontWeight:500 }}>👋 {getStoredFirstName()||'there'}</span>
-          <button className="p-btn" onClick={logout} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
+          <button className="p-btn" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
         </div>
       </nav>
 
@@ -322,5 +320,4 @@ function GoalsPage() {
   );
 }
 
-function logout() { localStorage.removeItem('calorific_token'); window.location.href = '/login'; }
 export default GoalsPage;

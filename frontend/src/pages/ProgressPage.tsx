@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import {
   getWeightHistory,
   getProgressSummary,
@@ -22,7 +23,6 @@ import {
   addLog,
   deleteLog,
   searchFoods,
-  logout,
   todayString,
   getStoredFirstName,
   type WeightEntry,
@@ -65,6 +65,7 @@ function sampleData(range: number) {
 }
 
 function ProgressPage() {
+  const { logout } = useAuth0();
   const navigate = useNavigate();
 
   const [range, setRange] = useState(30);
@@ -252,8 +253,7 @@ function ProgressPage() {
   }
 
   function handleLogout() {
-    logout();
-    navigate('/login');
+    logout({ logoutParams: { returnTo: window.location.origin } });
   }
 
   // ---- derived stats ----

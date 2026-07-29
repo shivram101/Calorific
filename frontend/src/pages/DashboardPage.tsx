@@ -1,9 +1,10 @@
 // src/pages/DashboardPage.tsx
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import {
   searchFoods, createCustomFood, getLogs, addLog, deleteLog, updateLog,
-  getWater, addWater, deleteWater, logout, todayString, getMicronutrients,
+  getWater, addWater, deleteWater, todayString, getMicronutrients,
   getStoredFirstName,
   type Food, type LogEntry, type Meal, type MicronutrientsResult,
 } from '../api/client';
@@ -17,6 +18,7 @@ const MEAL_COLORS: Record<Meal, string> = { breakfast:'#EF9F27', lunch:'#1FA873'
 const TODAY = todayString();
 
 function DashboardPage() {
+  const { logout } = useAuth0();
   const navigate   = useNavigate();
   const GOALS      = loadGoals();
 
@@ -24,19 +26,15 @@ function DashboardPage() {
   const [totals,       setTotals]       = useState({ calories:0, protein:0, fat:0, carbs:0 });
   const [diaryLoading, setDiaryLoading] = useState(true);
 
-  // An older Goals page stored the raw typed number (e.g. "4" meaning 4 L)
-  // instead of ml. Treat legacy values under 100 as litres and convert.
-  const readWaterTarget = () => {
-    const v = Number(localStorage.getItem('calorific_water_target')) || 2000;
-    return v > 0 && v < 100 ? Math.round(v * 1000) : v;
-  };
-  const [WATER_GOAL_ML, setWATER_GOAL_ML] = useState(readWaterTarget);
+  const [WATER_GOAL_ML, setWATER_GOAL_ML] = useState(() =>
+    Number(localStorage.getItem('calorific_water_target')) || 2000
+  );
   const [waterUnit, setWaterUnit] = useState<'L'|'gal'>(() =>
     (localStorage.getItem('calorific_water_unit') as 'L'|'gal') || 'L'
   );
   useEffect(() => {
     const sync = () => {
-      setWATER_GOAL_ML(readWaterTarget());
+      setWATER_GOAL_ML(Number(localStorage.getItem('calorific_water_target')) || 2000);
       setWaterUnit((localStorage.getItem('calorific_water_unit') as 'L'|'gal') || 'L');
     };
     window.addEventListener('focus', sync);
@@ -96,7 +94,7 @@ function DashboardPage() {
       setTotals(log.totals);
       setWaterMl(water.totalMl);
       setWaterEntries(water.entries);
-    } catch (err:any) { if (err.message?.includes('Invalid or expired token')) logout(); }
+    } catch (err:any) { /* Auth0's ProtectedRoute handles session expiry */ }
     finally { setDiaryLoading(false); }
   }, []);
 
@@ -247,7 +245,7 @@ function DashboardPage() {
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:12, color:'#2D2A26', background:'linear-gradient(135deg,#FFF8ED,#F5EFE0)', padding:'6px 12px', borderRadius:20, fontWeight:500 }}>👋 {getStoredFirstName()||'there'}</span>
-          <button className="p-btn" onClick={logout} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
+          <button className="p-btn" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
         </div>
       </nav>
 
@@ -444,9 +442,10 @@ function DashboardPage() {
 
       {/* SEARCH MODAL */}
       {searchModalOpen && (
-        <div className="ani-fadeIn" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={closeModal}>
+        <div className="ani-fadeIn" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:1000, display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={closeModal}>
           <div className="ani-slideUp" onClick={e=>e.stopPropagation()}
-            style={{ background:'#fff', borderRadius:24, padding:24, width:'100%', maxWidth:620, maxHeight:'88vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(0,0,0,.25)' }}>
+            style={{ background:'#fff', borderRadius:'24px 24px 0 0', padding:24, width:'100%', maxWidth:620, maxHeight:'88vh', overflowY:'auto', boxShadow:'0 -8px 48px rgba(0,0,0,.2)' }}>
+            <div style={{ width:40, height:5, background:'#E8E4DC', borderRadius:3, margin:'0 auto 18px' }} />
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:18 }}>
               <div style={{ fontWeight:800, fontSize:18, color:'#2D2A26' }}>Add Food</div>
               <button onClick={closeModal} className="p-btn" style={{ background:'#F5F2EE', border:'none', borderRadius:'50%', width:32, height:32, fontSize:16, color:'#777167' }}>✕</button>
@@ -617,9 +616,10 @@ function ProgressRing({value,max,color,label,unit,delay=0}:{value:number;max:num
 
 function MicroModal({title,subtitle,loading,loadingText,error,onClose,children}:any) {
   return (
-    <div className="ani-fadeIn" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:1100, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }} onClick={onClose}>
+    <div className="ani-fadeIn" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', backdropFilter:'blur(4px)', WebkitBackdropFilter:'blur(4px)', zIndex:1100, display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={onClose}>
       <div className="ani-slideUp" onClick={(e:any)=>e.stopPropagation()}
-        style={{ background:'#fff', borderRadius:24, padding:24, width:'100%', maxWidth:540, maxHeight:'80vh', overflowY:'auto', boxShadow:'0 24px 64px rgba(0,0,0,.22)' }}>
+        style={{ background:'#fff', borderRadius:'24px 24px 0 0', padding:24, width:'100%', maxWidth:540, maxHeight:'80vh', overflowY:'auto', boxShadow:'0 -8px 48px rgba(0,0,0,.18)' }}>
+        <div style={{ width:40, height:5, background:'#E8E4DC', borderRadius:3, margin:'0 auto 18px' }} />
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
           <div>
             <div style={{ fontWeight:800, fontSize:16, color:'#2D2A26' }}>{title}</div>

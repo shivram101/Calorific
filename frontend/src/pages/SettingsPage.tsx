@@ -1,7 +1,8 @@
 // src/pages/SettingsPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProfile, updateProfile, deleteAccount, logout, getStoredFirstName } from '../api/client';
+import { useAuth0 } from '@auth0/auth0-react';
+import { getProfile, updateProfile, deleteAccount, getStoredFirstName } from '../api/client';
 import { PAGE_CSS } from './PAGE_CSS';
 
 type GoalType = 'lose' | 'maintain' | 'build' | 'gain';
@@ -29,6 +30,7 @@ function kgToLbs(kg:number) { return Math.round(kg*KG_TO_LBS*10)/10; }
 function lbsToKg(lbs:number) { return Math.round((lbs/KG_TO_LBS)*10)/10; }
 
 function SettingsPage() {
+  const { logout } = useAuth0();
   const navigate = useNavigate();
   const [email,        setEmail]        = useState('');
   const [isVerified,   setIsVerified]   = useState(false);
@@ -65,8 +67,9 @@ function SettingsPage() {
         if (kg) setWeightDisplay(String(kg));
       }
     }).catch((err:any) => {
-      if (err.message?.includes('Invalid or expired token')) logout();
-      else setError('Could not load profile.');
+      // Auth0's ProtectedRoute handles session expiry automatically,
+      // so we no longer check for a stale JWT here — just surface any error.
+      setError('Could not load profile.');
     }).finally(() => setLoading(false));
   }, []);
 
@@ -104,7 +107,7 @@ function SettingsPage() {
   async function handleDelete() {
     if (!window.confirm('Delete your account? This permanently removes everything and cannot be undone.')) return;
     setDeleting(true);
-    try { await deleteAccount(); logout(); }
+    try { await deleteAccount(); logout({ logoutParams: { returnTo: window.location.origin } }); }
     catch (err:any) { setError(err.message||'Could not delete account.'); setDeleting(false); }
   }
 
@@ -147,7 +150,7 @@ function SettingsPage() {
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <span style={{ fontSize:12, color:'#2D2A26', background:'linear-gradient(135deg,#FFF8ED,#F5EFE0)', padding:'6px 12px', borderRadius:20, fontWeight:500 }}>👋 {getStoredFirstName()||'there'}</span>
-          <button className="p-btn" onClick={logout} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
+          <button className="p-btn" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} style={{ background:'linear-gradient(135deg,#c24337,#a83229)', color:'#fff', border:'none', padding:'7px 14px', borderRadius:20, fontWeight:600, fontSize:12 }}>Logout</button>
         </div>
       </nav>
 
