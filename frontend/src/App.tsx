@@ -1,8 +1,7 @@
 // src/App.tsx
 // Auth0 handles login/signup/verification/password-reset via its own hosted
-// Universal Login page, so those routes now just redirect out to Auth0
-// instead of rendering custom forms. ForgotPassword/ResetPassword/VerifyEmail
-// pages are retired entirely — Auth0 handles all three natively.
+// Universal Login page for web users. ResetPassword and VerifyEmail pages are
+// kept as lightweight public routes for mobile (JWT/SendGrid) users.
 
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
@@ -14,6 +13,8 @@ import GoalsPage from './pages/GoalsPage';
 import ProgressPage from './pages/ProgressPage';
 import SettingsPage from './pages/SettingsPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 
 // Catch-all for unmatched URLs. Collapses accidental double slashes
 // (e.g. a trailing-slash CLIENT_URL producing domain//something), then
@@ -32,6 +33,8 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/onboarding" element={<ProtectedRoute component={OnboardingPage} />} />
       <Route path="/Dashboard" element={<ProtectedRoute component={DashboardPage} />} />
       <Route path="/goals" element={<ProtectedRoute component={GoalsPage} />} />
